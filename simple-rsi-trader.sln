@@ -1,0 +1,105 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.31025.218
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "simple-rsi-trader", "simple-rsi-trader\simple-rsi-trader.csproj", "{4A221DD3-60CC-40A0-B9B9-F94F7445F13B}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{256ACCA0-1591-48A6-9A4A-47A8E194A4BE}"
+	ProjectSection(SolutionItems) = preProject
+		README.md = README.md
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Data", "Data", "{CC8A2B17-8F7A-414A-8C25-45526DFD1189}"
+	ProjectSection(SolutionItems) = preProject
+		Data\AUDCAD1440.csv = Data\AUDCAD1440.csv
+		Data\AUDCHF1440.csv = Data\AUDCHF1440.csv
+		Data\AUDJPY1440.csv = Data\AUDJPY1440.csv
+		Data\AUDNZD1440.csv = Data\AUDNZD1440.csv
+		Data\AUDUSD1440.csv = Data\AUDUSD1440.csv
+		Data\AUS2001440.csv = Data\AUS2001440.csv
+		Data\CADCHF1440.csv = Data\CADCHF1440.csv
+		Data\CADJPY1440.csv = Data\CADJPY1440.csv
+		Data\CAN601440.csv = Data\CAN601440.csv
+		Data\CHFJPY1440.csv = Data\CHFJPY1440.csv
+		Data\DUTCH251440.csv = Data\DUTCH251440.csv
+		Data\EURAUD1440.csv = Data\EURAUD1440.csv
+		Data\EURCAD1440.csv = Data\EURCAD1440.csv
+		Data\EURCHF1440.csv = Data\EURCHF1440.csv
+		Data\EURGBP1440.csv = Data\EURGBP1440.csv
+		Data\EURHUF1440.csv = Data\EURHUF1440.csv
+		Data\EURJPY1440.csv = Data\EURJPY1440.csv
+		Data\EURNOK1440.csv = Data\EURNOK1440.csv
+		Data\EURNZD1440.csv = Data\EURNZD1440.csv
+		Data\EURPLN1440.csv = Data\EURPLN1440.csv
+		Data\EURSEK1440.csv = Data\EURSEK1440.csv
+		Data\EURUSD1440.csv = Data\EURUSD1440.csv
+		Data\EUSTX501440.csv = Data\EUSTX501440.csv
+		Data\FRA401440.csv = Data\FRA401440.csv
+		Data\GBPAUD1440.csv = Data\GBPAUD1440.csv
+		Data\GBPCAD1440.csv = Data\GBPCAD1440.csv
+		Data\GBPCHF1440.csv = Data\GBPCHF1440.csv
+		Data\GBPJPY1440.csv = Data\GBPJPY1440.csv
+		Data\GBPNZD1440.csv = Data\GBPNZD1440.csv
+		Data\GBPUSD1440.csv = Data\GBPUSD1440.csv
+		Data\GER301440.csv = Data\GER301440.csv
+		Data\HK501440.csv = Data\HK501440.csv
+		Data\ITALY401440.csv = Data\ITALY401440.csv
+		Data\JPN2251440.csv = Data\JPN2251440.csv
+		Data\NATGAS1440.csv = Data\NATGAS1440.csv
+		Data\NDAQ1001440.csv = Data\NDAQ1001440.csv
+		Data\NOR251440.csv = Data\NOR251440.csv
+		Data\NZDCAD1440.csv = Data\NZDCAD1440.csv
+		Data\NZDCHF1440.csv = Data\NZDCHF1440.csv
+		Data\NZDUSD1440.csv = Data\NZDUSD1440.csv
+		Data\SPA351440.csv = Data\SPA351440.csv
+		Data\SPX5001440.csv = Data\SPX5001440.csv
+		Data\SWE301440.csv = Data\SWE301440.csv
+		Data\SWISS301440.csv = Data\SWISS301440.csv
+		Data\UK1001440.csv = Data\UK1001440.csv
+		Data\UKOIL1440.csv = Data\UKOIL1440.csv
+		Data\US301440.csv = Data\US301440.csv
+		Data\USDCAD1440.csv = Data\USDCAD1440.csv
+		Data\USDCHF1440.csv = Data\USDCHF1440.csv
+		Data\USDHUF1440.csv = Data\USDHUF1440.csv
+		Data\USDJPY1440.csv = Data\USDJPY1440.csv
+		Data\USDNOK1440.csv = Data\USDNOK1440.csv
+		Data\USDPLN1440.csv = Data\USDPLN1440.csv
+		Data\USDSEK1440.csv = Data\USDSEK1440.csv
+		Data\USDSGD1440.csv = Data\USDSGD1440.csv
+		Data\USDTRY1440.csv = Data\USDTRY1440.csv
+		Data\USOIL1440.csv = Data\USOIL1440.csv
+		Data\XAGUSD1440.csv = Data\XAGUSD1440.csv
+		Data\XAUUSD1440.csv = Data\XAUUSD1440.csv
+		Data\XBTUSD1440.csv = Data\XBTUSD1440.csv
+		Data\XPDUSD1440.csv = Data\XPDUSD1440.csv
+		Data\XPTUSD1440.csv = Data\XPTUSD1440.csv
+	EndProjectSection
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CommonLib", "CommonLib\CommonLib.csproj", "{6285299E-E490-4196-8AA9-B8D82011ADE7}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{4A221DD3-60CC-40A0-B9B9-F94F7445F13B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4A221DD3-60CC-40A0-B9B9-F94F7445F13B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4A221DD3-60CC-40A0-B9B9-F94F7445F13B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4A221DD3-60CC-40A0-B9B9-F94F7445F13B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6285299E-E490-4196-8AA9-B8D82011ADE7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6285299E-E490-4196-8AA9-B8D82011ADE7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6285299E-E490-4196-8AA9-B8D82011ADE7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6285299E-E490-4196-8AA9-B8D82011ADE7}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{CC8A2B17-8F7A-414A-8C25-45526DFD1189} = {256ACCA0-1591-48A6-9A4A-47A8E194A4BE}
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {976380BA-FF2B-46D2-AE70-DE12DBB22DEC}
+	EndGlobalSection
+EndGlobal
