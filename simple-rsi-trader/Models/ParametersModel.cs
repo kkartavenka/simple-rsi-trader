@@ -1,4 +1,5 @@
-﻿using System;
+﻿using CommonLib.Models;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -40,8 +41,8 @@ namespace simple_rsi_trader.Models
 
         public void ToModel()
         {
-            StopLoss = new PointStruct(min: StopLoss.Min, max: StopLoss.Max, val: OptimizableArray[(int)OptimizingParameters.StopLoss]);
-            TakeProfit = new PointStruct(min: TakeProfit.Min, max: TakeProfit.Max, val: OptimizableArray[(int)OptimizingParameters.TakeProfit]);
+            StopLoss = new PointStruct(range: StopLoss.Range, val: OptimizableArray[(int)OptimizingParameters.StopLoss]);
+            TakeProfit = new PointStruct(range: TakeProfit.Range, val: OptimizableArray[(int)OptimizingParameters.TakeProfit]);
 
             for (int i = _fixedOffset; i < OptimizableArray.Length; i++)
                 Weights[i] = OptimizableArray[i - _fixedOffset];

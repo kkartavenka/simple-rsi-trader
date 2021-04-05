@@ -1,75 +1,21 @@
-﻿using System;
+﻿using Accord.Statistics;
+using CommonLib.Extensions;
+using CommonLib.Models;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using static CommonLib.Models.DataModel;
 
 namespace CommonLib
 {
     public class CsvReaderClass
     {
+        public enum MetaTraderColumn : int { Date = 0, Time = 1, Open = 2, High = 3, Low = 4, Close = 5, Volume = 6 };
         public CsvReaderClass() { }
         public CsvReaderClass(string fileName, char splitChar, DateTime restrictDate)
         {
             string[] lines = File.ReadAllLines(fileName);
-            List<int> roundPoints = new List<int>();
-
-            foreach (string line in lines)
-            {
-                string[] row = line.Split(splitChar);
-
-                DateTime trueDate;
-
-                bool v1Parsed = DateTime.TryParseExact($"{row[0]} {row[1]}", "yyyy.MM.dd H:mm", null, System.Globalization.DateTimeStyles.None, out DateTime v1);
-                bool v2Parsed = DateTime.TryParseExact($"{row[0]} {row[1]}", "yyyy.MM.dd HH:mm", null, System.Globalization.DateTimeStyles.None, out DateTime v2);
-
-                trueDate = v1Parsed ? v1 : v2Parsed ? v2 : new DateTime();
-
-                if (trueDate != new DateTime())
-                {
-                    OhlcModel newElement = new OhlcModel()
-                    {
-                        Date = trueDate,
-                        Close = Convert.ToSingle(row[5]),
-                        High = Convert.ToSingle(row[3]),
-                        Open = Convert.ToSingle(row[2]),
-                        Low = Convert.ToSingle(row[4]),
-                        Volume = Convert.ToSingle(row[6])
-                    };
-
-                    newElement.TypicalPrice = (newElement.Close + newElement.High + newElement.Low) / 3;
-
-                    Ohlc.Add(newElement);
-                    try
-                    {
-                        roundPoints.Add(row[5].Split('.').ElementAt(1).Length);
-                    }
-                    catch
-                    { }
-                }
-                else
-                    Console.WriteLine("Error parsing date");
-            }
-
-            Ohlc = Ohlc
-                .OrderBy(m => m.Date)
-                .Where(m => m.Date > restrictDate)
-                .ToList();
-
-            RoundPoint = (int)roundPoints.ToArray().Median();
-        }
-
-        public async Task LoadFileAsync(string fileName, char splitChar, DateTime restrictDate)
-        {
-            string[] lines = await File.ReadAllLinesAsync(fileName);
-            ReadFile(lines, splitChar, restrictDate);
-        }
-
-        private void ReadFile(string[] lines, char splitChar, DateTime restrictDate)
-        {
-            //int[] roundPoints = new int[lines.Length];
-            OhlcModel[] dataArray = new OhlcModel[lines.Length];
 
             for (int i = 0; i < lines.Length; i++)
             {
@@ -78,59 +24,56 @@ namespace CommonLib
 
                 DateTime trueDate;
 
-                bool v1Parsed = DateTime.TryParseExact($"{row[0]} {row[1]}", "yyyy.MM.dd H:mm", null, System.Globalization.DateTimeStyles.None, out DateTime v1);
-                bool v2Parsed = DateTime.TryParseExact($"{row[0]} {row[1]}", "yyyy.MM.dd HH:mm", null, System.Globalization.DateTimeStyles.None, out DateTime v2);
+                string dateTimeString = $"{row[(int)MetaTraderColumn.Date]} {row[(int)MetaTraderColumn.Time]}";
+                bool v1Parsed = DateTime.TryParseExact(dateTimeString, "yyyy.MM.dd H:mm", null, System.Globalization.DateTimeStyles.None, out DateTime v1);
+                bool v2Parsed = DateTime.TryParseExact(dateTimeString, "yyyy.MM.dd HH:mm", null, System.Globalization.DateTimeStyles.None, out DateTime v2);
 
-                trueDate = v1Parsed ? v1 : v2Parsed ? v2 : new DateTime();
+                trueDate = v1Parsed ? v1 : v2Parsed ? v2 : new();
 
                 if (trueDate != new DateTime())
                 {
-                    dataArray[i] = new OhlcModel()
-                    {
-                        Date = trueDate,
-                        Close = Convert.ToSingle(row[5]),
-                        High = Convert.ToSingle(row[3]),
-                        Open = Convert.ToSingle(row[2]),
-                        Low = Convert.ToSingle(row[4]),
-                        Volume = Convert.ToSingle(row[6])
-                    };
+                    OhlcModel newElement = new(
+                        open: row.ConvertTo<double>(MetaTraderColumn.Open),
+                        high: row.ConvertTo<double>(MetaTraderColumn.High),
+                        low: row.ConvertTo<double>(MetaTraderColumn.Low),
+                        close: row.ConvertTo<double>(MetaTraderColumn.Close),
+                        volume: row.ConvertTo<double>(MetaTraderColumn.Volume),
+                        date: trueDate);
 
-                    dataArray[i].TypicalPrice = (dataArray[i].Close + dataArray[i].High + dataArray[i].Low) / 3;
-
+                    Ohlc.Add(newElement);
                     try
                     {
-                        int roundPoint = row[5].IndexOf('.') >= 0 ? row[5].Length - row[5].IndexOf('.') - 1 : 0;
-                        if (roundPoint > RoundPoint)
+                        int dotIndex = row[(int)MetaTraderColumn.Close].IndexOf('.');
+                        int roundPoint = row[(int)MetaTraderColumn.Close].Length - dotIndex;
+                        if (dotIndex > -1 && roundPoint > RoundPoint)
                             RoundPoint = roundPoint;
                     }
-                    catch
-                    { }
+                    catch (Exception error)
+                    {
+                        Console.WriteLine($"Exception in parsing separation sign: {error.Message}");
+                    }
                 }
                 else
                     Console.WriteLine("Error parsing date");
             }
 
-            Ohlc = dataArray.OrderBy(m => m.Date).Where(m => m.Date > restrictDate).ToList();
+            Ohlc = Ohlc
+                .OrderBy(m => m.Date)
+                .Where(m => m.Date >= restrictDate)
+                .ToList();
         }
 
-        public void LoadFile(string fileName, char splitChar, DateTime restrictDate)
-        {
-            string[] lines = File.ReadAllLines(fileName);
-            ReadFile(lines, splitChar, restrictDate);
-        }
-
-
-        public void PrepareSourceData(int testSize, int? trainSize, int dataArraySize, bool cleanUp, int cleanUpWindowSize = 20)
+        public void PrepareSourceData(int dataArraySize, bool cleanUp, int cleanUpWindowSize = 20)
         {
             int i = cleanUpWindowSize;
-            while (cleanUp && i < Ohlc.Count())
+            while (cleanUp && i < Ohlc.Count)
             {
                 List<OhlcModel> selectedSequence = Ohlc.Skip(i - cleanUpWindowSize).Take(cleanUpWindowSize).ToList();
                 double median = selectedSequence.Select(m => (double)m.Volume).SkipLast(1).ToArray().Median();
 
                 if (Ohlc[i - 1].Volume <= median * 0.15)
                 {
-                    if (i > 2 && i < Ohlc.Count())
+                    if (i > 2 && i < Ohlc.Count)
                     {
                         int dayBefore = (int)Math.Abs(Math.Round((Ohlc[i - 2].Date - Ohlc[i - 1].Date).TotalDays));
                         int dayAfter = (int)Math.Abs(Math.Round((Ohlc[i].Date - Ohlc[i - 1].Date).TotalDays));
@@ -162,36 +105,24 @@ namespace CommonLib
                     i++;
             }
 
-            ContentTestOhlc = Ohlc.Copy().TakeLast(testSize + 400).ToList();
-            if (trainSize != null)
-                ContentTrainOhlc = Ohlc.Copy().SkipLast(testSize).TakeLast((int)trainSize + 400).ToList();
-            else
-                ContentTrainOhlc = Ohlc.Copy().SkipLast(testSize).ToList();
-
-            ContentTest = Translate(ohlcData: ContentTestOhlc, dataArraySize: dataArraySize); //new DataModel[ContentTestOhlc.Count()];
-            ContentTrain = Translate(ohlcData: ContentTrainOhlc, dataArraySize: dataArraySize);// new DataModel[ContentTrainOhlc.Count()];
-            ContentAll = Translate(ohlcData: Ohlc.Copy(), dataArraySize: dataArraySize);
+            Data = Translate(dataArraySize);
         }
 
-        private DataModel[] Translate(List<OhlcModel> ohlcData, int dataArraySize)
+        private DataModel[] Translate(int dataArraySize)
         {
-            DataModel[] returnModel = new DataModel[ohlcData.Count()];
+            DataModel[] returnModel = new DataModel[Ohlc.Count];
 
-            for (int j = 0; j < ohlcData.Count(); j++)
+            for (int j = 0; j < Ohlc.Count; j++)
             {
                 double[] dataArray = new double[dataArraySize];
-                dataArray[0] = ohlcData[j].Open;
-                dataArray[1] = ohlcData[j].High;
-                dataArray[2] = ohlcData[j].Low;
-                dataArray[3] = ohlcData[j].Close;
-                dataArray[4] = ohlcData[j].TypicalPrice;
-                dataArray[5] = ohlcData[j].Volume;
+                dataArray[(int)DataColumn.Open] = Ohlc[j].Open;
+                dataArray[(int)DataColumn.High] = Ohlc[j].High;
+                dataArray[(int)DataColumn.Low] = Ohlc[j].Low;
+                dataArray[(int)DataColumn.Close] = Ohlc[j].Close;
+                dataArray[(int)DataColumn.TypicalPrice] = Ohlc[j].TypicalPrice;
+                dataArray[(int)DataColumn.Volume] = Ohlc[j].Volume;
 
-                returnModel[j] = new DataModel()
-                {
-                    Date = ohlcData[j].Date,
-                    Data = dataArray
-                };
+                returnModel[j] = new DataModel(data: dataArray, date: Ohlc[j].Date);
             }
 
             return returnModel;
@@ -200,14 +131,8 @@ namespace CommonLib
 
         #region Properties
 
-        public DataModel[] ContentAll { get; private set; }
-        public DataModel[] ContentTest { get; private set; }
-        public List<OhlcModel> ContentTestOhlc { get; private set; }
+        public DataModel[] Data { get; private set; }
 
-        public DataModel[] ContentTrain { get; private set; }
-        public List<OhlcModel> ContentTrainOhlc { get; private set; }
-
-        //public List<OhlcModel> Ohlc { get; private set; } = new List<OhlcModel>();
         public List<OhlcModel> Ohlc { get; private set; } = new List<OhlcModel>();
 
         public int RoundPoint { get; private set; }

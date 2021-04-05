@@ -1,16 +1,16 @@
-﻿namespace CommonLib.Models
+﻿using CommonLib.Models.Range;
+
+namespace CommonLib.Models
 {
     public struct PointStruct
     {
-        public PointStruct(double min, double max, double val)
+        public PointStruct(DoubleRangeStruct range, double val)
         {
-            Min = min;
-            Max = max;
+            Range = range;
             Value = val;
         }
 
-        public double Min { get; set; }
-        public double Max { get; set; }
+        public DoubleRangeStruct Range { get; set; }
         public double Value { get; set; }
     }
 }

@@ -6,6 +6,7 @@ namespace CommonLib.Models
     {
         public OhlcModel(double open, double high, double low, double close, double volume, DateTime date)
         {
+            Open = open;
             High = high;
             Low = low;
             Close = close;

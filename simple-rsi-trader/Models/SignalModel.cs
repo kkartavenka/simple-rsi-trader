@@ -2,6 +2,12 @@
 {
     public class SignalModel
     {
+        public SignalModel(string name, double commission)
+        {
+            Name = name;
+            Commission = commission;
+        }
+
         // Filename for the data source excluding full path to the file
         public string Name { get; set; }
 
