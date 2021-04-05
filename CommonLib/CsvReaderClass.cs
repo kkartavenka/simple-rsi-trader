@@ -12,7 +12,7 @@ namespace CommonLib
     public class CsvReaderClass
     {
         public enum MetaTraderColumn : int { Date = 0, Time = 1, Open = 2, High = 3, Low = 4, Close = 5, Volume = 6 };
-        public CsvReaderClass() { }
+
         public CsvReaderClass(string fileName, char splitChar, DateTime restrictDate)
         {
             string[] lines = File.ReadAllLines(fileName);

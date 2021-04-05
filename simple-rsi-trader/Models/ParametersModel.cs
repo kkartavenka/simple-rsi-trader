@@ -1,26 +1,27 @@
 ﻿using CommonLib.Models;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace simple_rsi_trader.Models
 {
     public class ParametersModel
     {
         private const int _fixedOffset = 2;
-        private enum OptimizingParameters : int  {StopLoss = 0, TakeProfit = 1};
+        public enum OptimizingParameters : int  {StopLoss = 0, TakeProfit = 1};
+        public enum OperationType : int { Buy = 0, Sell = 1 };
 
-        public ParametersModel(PointStruct stopLoss, PointStruct takeProfit, double[] weights)
+        public ParametersModel(PointStruct stopLoss, PointStruct takeProfit, double[] weights, int indicatorLastPointSequence, OperationType operation)
         {
             StopLoss = stopLoss;
             TakeProfit = takeProfit;
             Weights = weights;
+            Operation = operation;
+            IndicatorLastPointSequence = indicatorLastPointSequence;
 
             ParametersCount = _fixedOffset + weights.Length;
         }
 
+        public int IndicatorLastPointSequence { get; private set; }
+
+        public OperationType Operation { get; private set; }
         public double[] OptimizableArray { get; set; }
         public int ParametersCount { get; private set; }
 
