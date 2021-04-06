@@ -33,6 +33,10 @@ namespace simple_rsi_trader.Classes
 
         private Dictionary<int, DataModel[]> RsiEnrichedCollection { get; set; } = new Dictionary<int, DataModel[]>();
 
+        private Dictionary<int, SequenceClass[]> TrainSet { get; set; } = new Dictionary<int, SequenceClass[]>();
+        private Dictionary<int, SequenceClass[]> ValidationSet { get; set; } = new Dictionary<int, SequenceClass[]>();
+        private Dictionary<int, SequenceClass[]> TestSet { get; set; } = new Dictionary<int, SequenceClass[]>();
+
         public OptimizerInitClass(int testSize, int validationSize, IntRangeStruct rsiRange, DoubleRangeStruct stopLossRange, DoubleRangeStruct takeProfitRange, DataModel[] data, IntRangeStruct lastRsiSequence, int horizon, DateTime restrictByDate)
         {
             _horizon = horizon;
@@ -44,7 +48,34 @@ namespace simple_rsi_trader.Classes
             _takeProfitRange = takeProfitRange;
             _sourceData = data;
 
-            InitializeRsi();
+            InitializeRsi(restrictByDate);
+            CreateSequences();
+        }
+
+        private void CreateSequences()
+        {
+            int testTestEndIndex = RsiEnrichedCollection[_rsiRange.Min].Length - _testSize - _validationSize;
+            int validationEndIndex = RsiEnrichedCollection[_rsiRange.Min].Length - _testSize;
+
+            foreach (KeyValuePair<int, DataModel[]> data in RsiEnrichedCollection)
+            {
+                List<SequenceClass> trainSequences = new();
+                List<SequenceClass> validationSequences = new();
+                List<SequenceClass> testSequences = new();
+
+                for (int i = _lastRsiSequence.Max; i < testTestEndIndex; i++)
+                    trainSequences.Add(new(before: data.Value[(i - _lastRsiSequence.Max)..i], after: data.Value[i..(i + _horizon)]));
+
+                for (int i = testTestEndIndex; i < validationEndIndex; i++)
+                    validationSequences.Add(new(before: data.Value[(i - _lastRsiSequence.Max)..i], after: data.Value[i..(i + _horizon)]));
+
+                for (int i = validationEndIndex; i < data.Value.Length - _horizon; i++)
+                    testSequences.Add(new(before: data.Value[(i - _lastRsiSequence.Max)..i], after: data.Value[i..(i + _horizon)]));
+
+                TrainSet.Add(data.Key, trainSequences.ToArray());
+                ValidationSet.Add(data.Key, validationSequences.ToArray());
+                TestSet.Add(data.Key, testSequences.ToArray());
+            }
         }
 
         private List<ParametersModel> GenerateInitPoints(int count)
@@ -62,6 +93,7 @@ namespace simple_rsi_trader.Classes
                 double sellSlope = ((_rsiMax - sellConstant) / lastPointSequence).GetRandomDouble();
 
                 returnVar.Add(new(
+                    rsiPeriod: (_rsiRange.Max - _rsiRange.Min).GetRandomInt() + _rsiRange.Min,
                     stopLoss: new(_stopLossRange, (_stopLossRange.Max - _stopLossRange.Min).GetRandomDouble() + _stopLossRange.Min),
                     takeProfit: new(_takeProfitRange, (_takeProfitRange.Max - _takeProfitRange.Min).GetRandomDouble() + _takeProfitRange.Min),
                     weights: new double[] { buyConstant, buySlope },
@@ -69,6 +101,7 @@ namespace simple_rsi_trader.Classes
                     operation: OperationType.Buy));
 
                 returnVar.Add(new(
+                    rsiPeriod: (_rsiRange.Max - _rsiRange.Min).GetRandomInt() + _rsiRange.Min,
                     stopLoss: new(_stopLossRange, (_stopLossRange.Max - _stopLossRange.Min).GetRandomDouble() + _stopLossRange.Min),
                     takeProfit: new(_takeProfitRange, (_takeProfitRange.Max - _takeProfitRange.Min).GetRandomDouble() + _takeProfitRange.Min),
                     weights: new double[] { sellConstant, sellSlope },
@@ -79,7 +112,7 @@ namespace simple_rsi_trader.Classes
             return returnVar;
         }
 
-        private void InitializeRsi()
+        private void InitializeRsi(DateTime restrictByDate)
         {
             for (int i = _rsiRange.Min; i < _rsiRange.Max; i++)
             {
@@ -87,9 +120,16 @@ namespace simple_rsi_trader.Classes
                 DataModel[] data = _sourceData.Copy();
 
                 data = rsi.GetRSi(data, (int)DataColumn.Close, (int)DataColumn.Rsi);
+                data = data
+                    .Where(m => m.Date >= restrictByDate)
+                    .OrderBy(m => m.Date)
+                    .ToArray();
+
                 RsiEnrichedCollection.Add(i, data);
             }
         }
+
+
 
         public void StartOptimization(int randomInitCount, int degreeOfParallelism = -1)
         {

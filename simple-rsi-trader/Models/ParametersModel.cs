@@ -8,8 +8,15 @@ namespace simple_rsi_trader.Models
         public enum OptimizingParameters : int  {StopLoss = 0, TakeProfit = 1};
         public enum OperationType : int { Buy = 0, Sell = 1 };
 
-        public ParametersModel(PointStruct stopLoss, PointStruct takeProfit, double[] weights, int indicatorLastPointSequence, OperationType operation)
+        public ParametersModel(
+            int rsiPeriod,
+            PointStruct stopLoss, 
+            PointStruct takeProfit, 
+            double[] weights, 
+            int indicatorLastPointSequence, 
+            OperationType operation)
         {
+            RsiPeriod = rsiPeriod;
             StopLoss = stopLoss;
             TakeProfit = takeProfit;
             Weights = weights;
@@ -24,7 +31,7 @@ namespace simple_rsi_trader.Models
         public OperationType Operation { get; private set; }
         public double[] OptimizableArray { get; set; }
         public int ParametersCount { get; private set; }
-
+        public int RsiPeriod { get; private set; }
         public PointStruct StopLoss { get; private set; }
 
         public PointStruct TakeProfit { get; private set; }
