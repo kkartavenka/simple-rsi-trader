@@ -11,7 +11,7 @@ namespace simple_rsi_trader
 {
     class Program
     {
-        static readonly int _degreeOfParallelism = Environment.ProcessorCount;
+        static readonly int _degreeOfParallelism = 1;// Environment.ProcessorCount;
 
         #region Training and validation
 
@@ -66,7 +66,9 @@ namespace simple_rsi_trader
                     data: csvReader.Data,
                     horizon: _horizon,
                     lastRsiSequence: _lastRsiSequence,
-                    restrictByDate: _restrictByDate);
+                    restrictByDate: _restrictByDate,
+                    commission: instrument.Commission,
+                    roundPoint: csvReader.RoundPoint);
 
                 optimizer.StartOptimization(randomInitCount: _randomInitCount, degreeOfParallelism: _degreeOfParallelism);
             });

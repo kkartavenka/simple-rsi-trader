@@ -1,4 +1,5 @@
-﻿using System;
+﻿using CommonLib.Models.Range;
+using System;
 using System.Security.Cryptography;
 
 namespace CommonLib.Extensions
@@ -17,5 +18,8 @@ namespace CommonLib.Extensions
         }
 
         public static int GetRandomInt(this int x) => (int)((double)x).GetRandomDouble();
+
+        public static double ScaleMinMax(this double x, DoubleRangeStruct observedRange, DoubleRangeStruct scale) =>
+            scale.Min + (x - observedRange.Min) * (scale.Max - scale.Min) / (observedRange.Max - observedRange.Min);
     }
 }
