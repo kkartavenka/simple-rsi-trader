@@ -21,11 +21,13 @@ namespace CommonLib.Models
         private readonly DoubleRangeStruct _observed = new(min: 0, max: 1);
         private readonly DoubleRangeStruct _scale = new(min: 0.1, max: 1.5);
 
-        public void CalculateMetrics() {
+        public void CalculateMetrics(double commission, int size) {
             WinRate = (double)WinCount / ActionCount;
             LossRate = (double)LossCount / ActionCount;
             double lossRateScaled = LossRate.ScaleMinMax(_observed, _scale);
             Score = Profit + Profit * WinRate / lossRateScaled;
+
+            Profit /= (commission * size);
         }
 
     }

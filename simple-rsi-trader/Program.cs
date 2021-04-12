@@ -11,14 +11,14 @@ namespace simple_rsi_trader
 {
     class Program
     {
-        static readonly int _degreeOfParallelism = 1;// Environment.ProcessorCount;
+        static readonly int _degreeOfParallelism = Environment.ProcessorCount;
+        static readonly int _saveTopModelCount = 20;
 
         #region Training and validation
 
         static readonly int _horizon = 1;
-        static readonly int _testSize = 25;
-        static readonly int _validationSize = 50;
-        static readonly int _randomInitCount = 1000;
+        static readonly int _testSize = 50;
+        static readonly int _randomInitCount = 10000;
 
         #endregion
 
@@ -26,8 +26,8 @@ namespace simple_rsi_trader
 
         static readonly IntRangeStruct _lastRsiSequence = new(0, 5); // A range through RSi through which line should be "drawn", where 0 represents a single day
         static readonly IntRangeStruct _rsiRange = new(7, 21);
-        static readonly DoubleRangeStruct _stopLossRange = new(10, 20); // Definied as a multiplier to commission
-        static readonly DoubleRangeStruct _takeProfitRange = new(40, 50); // Definied as a multiplier to commission
+        static readonly DoubleRangeStruct _stopLossRange = new(10, 40); // Definied as a multiplier to commission
+        static readonly DoubleRangeStruct _takeProfitRange = new(40, 160); // Definied as a multiplier to commission
 
         #endregion
 
@@ -59,7 +59,6 @@ namespace simple_rsi_trader
 
                 OptimizerInitClass optimizer = new(
                     testSize: _testSize,
-                    validationSize: _validationSize,
                     rsiRange: _rsiRange,
                     stopLossRange: _stopLossRange,
                     takeProfitRange: _takeProfitRange,
@@ -68,6 +67,8 @@ namespace simple_rsi_trader
                     lastRsiSequence: _lastRsiSequence,
                     restrictByDate: _restrictByDate,
                     commission: instrument.Commission,
+                    instrument: instrument.Name,
+                    saveTop: _saveTopModelCount,
                     roundPoint: csvReader.RoundPoint);
 
                 optimizer.StartOptimization(randomInitCount: _randomInitCount, degreeOfParallelism: _degreeOfParallelism);

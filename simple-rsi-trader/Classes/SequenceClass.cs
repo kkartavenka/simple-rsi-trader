@@ -6,6 +6,7 @@ using System.Text;
 using System.Threading.Tasks;
 using static CommonLib.Models.DataModel;
 
+#nullable enable
 namespace simple_rsi_trader.Classes
 {
     public class SequenceClass
