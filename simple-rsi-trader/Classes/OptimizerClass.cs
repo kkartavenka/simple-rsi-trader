@@ -41,7 +41,7 @@ namespace simple_rsi_trader.Classes
 
             for (int i = 0; i < rsiSequence.Length; i++) {
                 if (_parameter.Operation == OperationType.Buy) {
-                    if (weights[(int)OptimizingParameters.Weight0] + weights[(int)OptimizingParameters.Weight1] * i < rsiSequence[i]) {
+                    if (weights[(int)OptimizingParameters.Weight0] - weights[(int)OptimizingParameters.Weight1] * i < rsiSequence[i]) {
                         returnVar = false;
                         break;
                     }
@@ -69,6 +69,30 @@ namespace simple_rsi_trader.Classes
                 returnVar[(int)OptimizingParameters.TakeProfit] = _parameter.TakeProfit.Range.Min;
             else if (returnVar[(int)OptimizingParameters.TakeProfit] > _parameter.TakeProfit.Range.Max)
                 returnVar[(int)OptimizingParameters.TakeProfit] = _parameter.TakeProfit.Range.Max;
+
+            if(_parameter.Operation == OperationType.Buy) {
+                if (returnVar[(int)OptimizingParameters.Weight0] > _parameter.RsiLimits.Range.Max)
+                    returnVar[(int)OptimizingParameters.Weight0] = _parameter.RsiLimits.Range.Max;
+
+                double recentRsiCut = returnVar[(int)OptimizingParameters.Weight0] - _parameter.IndicatorLastPointSequence * returnVar[(int)OptimizingParameters.Weight1];
+                if (recentRsiCut > _parameter.RsiLimits.Range.Max)
+                    returnVar[(int)OptimizingParameters.Weight1] = (_parameter.RsiLimits.Range.Max - returnVar[(int)OptimizingParameters.Weight0]) / _parameter.IndicatorLastPointSequence;
+                
+                //double buySlope = _parameter.IndicatorLastPointSequence == 0 ? 0 : ((returnVar[(int)OptimizingParameters.Weight0] - _parameter.RsiLimits.Range.Min) / _parameter.IndicatorLastPointSequence);
+                //returnVar[(int)OptimizingParameters.Weight1] = buySlope;
+            }
+            else {
+                if (returnVar[(int)OptimizingParameters.Weight0] < _parameter.RsiLimits.Range.Min)
+                    returnVar[(int)OptimizingParameters.Weight0] = _parameter.RsiLimits.Range.Min;
+
+                double recentRsiCut = returnVar[(int)OptimizingParameters.Weight0] + _parameter.IndicatorLastPointSequence * returnVar[(int)OptimizingParameters.Weight1];
+                if (recentRsiCut < _parameter.RsiLimits.Range.Min)
+                    returnVar[(int)OptimizingParameters.Weight1] = (returnVar[(int)OptimizingParameters.Weight0] - _parameter.RsiLimits.Range.Min) / _parameter.IndicatorLastPointSequence;
+
+                //double sellSlope = _parameter.IndicatorLastPointSequence == 0 ? 0 : ((_parameter.RsiLimits.Range.Max - returnVar[(int)OptimizingParameters.Weight0]) / _parameter.IndicatorLastPointSequence);
+                //returnVar[(int)OptimizingParameters.Weight1] = sellSlope;
+            }
+
 
             return returnVar;
         }
@@ -210,7 +234,7 @@ namespace simple_rsi_trader.Classes
 
             if (Performance[ExecutionType.Test].Profit > 0 && double.IsFinite(Performance[_executionType].WinRate) && Performance[ExecutionType.Test].Profit < 1000) {
                 IsSuccess = true;
-                Console.WriteLine($"Training: {(Performance[ExecutionType.Train].Profit):N2}\tTesting: {(Performance[ExecutionType.Test].Profit):N2}\t SL: {_parameter.StopLoss.Value}\tTP: {_parameter.TakeProfit.Value}\tIterations: {_iteration}");
+                Console.WriteLine($"{_parameter.Operation}\tTraining: {(Performance[ExecutionType.Train].Profit):N2}\tTesting: {(Performance[ExecutionType.Test].Profit):N2}\t SL: {_parameter.StopLoss.Value}\tTP: {_parameter.TakeProfit.Value}\tIterations: {_iteration}");
             }
         }
 

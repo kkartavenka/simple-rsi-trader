@@ -3,6 +3,7 @@ using CommonLib.Extensions;
 using CommonLib.Indicators;
 using CommonLib.Models;
 using CommonLib.Models.Range;
+using Newtonsoft.Json;
 using simple_rsi_trader.Models;
 using System;
 using System.Collections.Concurrent;
@@ -21,10 +22,10 @@ namespace simple_rsi_trader.Classes
 {
     public class OptimizerInitClass
     {
-        private const double _rsiConstantBuy = 50;
+        /*private const double _rsiConstantBuy = 50;
         private const double _rsiConstantSell = 50;
         private const double _rsiMin = 10;
-        private const double _rsiMax = 90;
+        private const double _rsiMax = 90;*/
 
         private readonly int _saveTop;
 
@@ -46,6 +47,12 @@ namespace simple_rsi_trader.Classes
 
         private int _modelsLeft;
 
+        private readonly DoubleRangeStruct _rsiBuyLimits;
+        private readonly DoubleRangeStruct _rsiSellLimits;
+
+
+        private readonly string _modelFileName;
+
 
         private bool _completionToken = false;
 
@@ -56,6 +63,8 @@ namespace simple_rsi_trader.Classes
         public OptimizerInitClass(
             int testSize,
             IntRangeStruct rsiRange,
+            DoubleRangeStruct rsiBuyLimits,
+            DoubleRangeStruct rsiSellLimits,
             DoubleRangeStruct stopLossRange,
             DoubleRangeStruct takeProfitRange,
             DataModel[] data,
@@ -66,6 +75,8 @@ namespace simple_rsi_trader.Classes
             string instrument,
             int saveTop,
             int roundPoint) {
+            _rsiBuyLimits = rsiBuyLimits;
+            _rsiSellLimits = rsiSellLimits;
             _saveTop = saveTop;
             _instrument = instrument;
             _commission = commission;
@@ -80,6 +91,8 @@ namespace simple_rsi_trader.Classes
 
             InitializeRsi(restrictByDate);
             CreateSequences();
+
+            _modelFileName = $"{_instrument}.trained";
 
             _saveThread = new Thread(new ThreadStart(SaveThread));
             _saveThread.Start();
@@ -129,28 +142,30 @@ namespace simple_rsi_trader.Classes
             List<ParametersModel> returnVar = new();
 
             for (int i = 0; i < count; i++) {
-                double buyConstant = _rsiMin + (_rsiConstantBuy - _rsiMin).GetRandomDouble();
-                double sellConstant = _rsiConstantSell + (_rsiMax - _rsiConstantSell).GetRandomDouble();
+                PointStruct buyConstant = new(range: _rsiBuyLimits, val: _rsiBuyLimits.Min + (_rsiBuyLimits.Max - _rsiBuyLimits.Min).GetRandomDouble());
+                PointStruct sellConstant = new(range: _rsiSellLimits, val: _rsiSellLimits.Min + (_rsiSellLimits.Max - _rsiSellLimits.Min).GetRandomDouble());
 
                 int lastPointSequence = (_lastRsiSequence.Max - _lastRsiSequence.Min).GetRandomInt() + _lastRsiSequence.Min;
 
-                double buySlope = lastPointSequence == 0 ? 0 : ((buyConstant - _rsiMin) / lastPointSequence).GetRandomDouble();
-                double sellSlope = lastPointSequence == 0 ? 0 : ((_rsiMax - sellConstant) / lastPointSequence).GetRandomDouble();
+                double buySlope = lastPointSequence == 0 ? 0 : ((buyConstant.Value - _rsiBuyLimits.Min) / lastPointSequence).GetRandomDouble();
+                double sellSlope = lastPointSequence == 0 ? 0 : ((_rsiSellLimits.Max - sellConstant.Value) / lastPointSequence).GetRandomDouble();
 
                 returnVar.Add(new(
                     rsiPeriod: (_rsiRange.Max - _rsiRange.Min).GetRandomInt() + _rsiRange.Min,
+                    rsiLimits: buyConstant,
                     stopLoss: new(_stopLossRange, (_stopLossRange.Max - _stopLossRange.Min).GetRandomDouble() + _stopLossRange.Min),
                     takeProfit: new(_takeProfitRange, (_takeProfitRange.Max - _takeProfitRange.Min).GetRandomDouble() + _takeProfitRange.Min),
-                    weights: new double[] { buyConstant, buySlope },
+                    weights: new double[] { buyConstant.Value, buySlope },
                     indicatorLastPointSequence: lastPointSequence,
                     offset: new double[] { 10d.GetRandomDouble(), 0.1d.GetRandomDouble() },
                     operation: OperationType.Buy));
 
                 returnVar.Add(new(
                     rsiPeriod: (_rsiRange.Max - _rsiRange.Min).GetRandomInt() + _rsiRange.Min,
+                    rsiLimits: sellConstant,
                     stopLoss: new(_stopLossRange, (_stopLossRange.Max - _stopLossRange.Min).GetRandomDouble() + _stopLossRange.Min),
                     takeProfit: new(_takeProfitRange, (_takeProfitRange.Max - _takeProfitRange.Min).GetRandomDouble() + _takeProfitRange.Min),
-                    weights: new double[] { sellConstant, sellSlope },
+                    weights: new double[] { sellConstant.Value, sellSlope },
                     indicatorLastPointSequence: lastPointSequence,
                     offset: new double[] { 10d.GetRandomDouble(), 0.1d.GetRandomDouble() },
                     operation: OperationType.Sell));
@@ -177,6 +192,26 @@ namespace simple_rsi_trader.Classes
             }
         }
 
+        private List<SavedModel> LoadSavedModels() {
+
+            if (!File.Exists(_modelFileName))
+                return new();
+
+            string content = File.ReadAllText(_modelFileName);
+
+            if (content == string.Empty)
+                return new();
+
+            List<SavedModel> returnVar = new();
+            try {
+                returnVar = JsonConvert.DeserializeObject<List<SavedModel>>(content); //JsonSerializer.Deserialize<List<SavedModel>>(content);
+            }
+            catch (Exception exception) {
+                Console.WriteLine($"{exception.Message}");
+            }
+            return returnVar;            
+        }
+
         private void SaveThread() {
             while (!_completionToken) {
                 while (_parametersQueue.TryDequeue(out SavedModel newModel))
@@ -185,13 +220,15 @@ namespace simple_rsi_trader.Classes
                 List<SavedModel> savedFiltered = new ();
                 _parametersSaved.GroupBy(m => m.Parameters.Operation).ToList().ForEach(row => savedFiltered.AddRange(row.OrderByDescending(m => m.TrainedPerformance.Profit).Take(_saveTop)));
 
-                Console.WriteLine($"{DateTime.Now} Models left: {_modelsLeft}");
+                if (savedFiltered.Count != 0) {
+                    Console.WriteLine($"{DateTime.Now} Models left: {_modelsLeft}");
 
-                try {
-                    File.WriteAllText($"{_instrument}.trained", JsonSerializer.Serialize(_parametersSaved));
-                }
-                catch (Exception exception) {
-                    Console.WriteLine(exception.Message);
+                    try {
+                        File.WriteAllText(_modelFileName, JsonConvert.SerializeObject(_parametersSaved));
+                    }
+                    catch (Exception exception) {
+                        Console.WriteLine(exception.Message);
+                    }
                 }
 
                 Thread.Sleep(5000);
@@ -202,25 +239,34 @@ namespace simple_rsi_trader.Classes
             int degOfParal = degreeOfParallelism == -1 ? Environment.ProcessorCount : degreeOfParallelism;
             List<ParametersModel> initParameters = GenerateInitPoints(randomInitCount);
 
-            initParameters.AsParallel().WithDegreeOfParallelism(degOfParal).ForAll(parameter => {
-                OptimizerClass optimizer = new (sequences: TrainSet[parameter.RsiPeriod], parameter: parameter, commission: _commission, roundPoint: _roundPoint);
-                optimizer.Optimize();
+            List<ParametersModel> savedModels = LoadSavedModels().Select(m => m.Parameters).ToList();
 
-                if (optimizer.IsSuccess) {
-                    optimizer.LoadSequence(TestSet[parameter.RsiPeriod]);
-                    optimizer.Test();
+            if (savedModels.Count != 0) {
+                _modelsLeft += savedModels.Count;
+                OptimizationRunner(savedModels, degOfParal);
+            }
 
-                    if (optimizer.IsSuccess)
-                        _parametersQueue.Enqueue(new (parameters: parameter.Copy(), tested: optimizer.Performance[ExecutionType.Test], trained: optimizer.Performance[ExecutionType.Train]));
-                }
-
-                _modelsLeft--;
-            });
+            OptimizationRunner(initParameters, degOfParal);
 
             _completionToken = true;
             _saveThread.Join();
 
             DisplayResults();
         }
+
+        private void OptimizationRunner(List<ParametersModel> parameters, int degOfParal) => parameters.AsParallel().WithDegreeOfParallelism(degOfParal).ForAll(parameter => {
+            OptimizerClass optimizer = new(sequences: TrainSet[parameter.RsiPeriod], parameter: parameter, commission: _commission, roundPoint: _roundPoint);
+            optimizer.Optimize();
+
+            if (optimizer.IsSuccess) {
+                optimizer.LoadSequence(TestSet[parameter.RsiPeriod]);
+                optimizer.Test();
+
+                if (optimizer.IsSuccess)
+                    _parametersQueue.Enqueue(new(parameters: parameter.Copy(), tested: optimizer.Performance[ExecutionType.Test], trained: optimizer.Performance[ExecutionType.Train]));
+            }
+
+            _modelsLeft--;
+        });
     }
 }

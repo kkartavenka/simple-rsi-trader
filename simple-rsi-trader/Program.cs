@@ -12,22 +12,25 @@ namespace simple_rsi_trader
     class Program
     {
         static readonly int _degreeOfParallelism = Environment.ProcessorCount;
-        static readonly int _saveTopModelCount = 20;
+        static readonly int _saveTopModelCount = 50;
 
         #region Training and validation
 
         static readonly int _horizon = 1;
         static readonly int _testSize = 50;
-        static readonly int _randomInitCount = 10000;
+        static readonly int _randomInitCount = 100000;
 
         #endregion
 
         #region Parameters range setup
 
-        static readonly IntRangeStruct _lastRsiSequence = new(0, 5); // A range through RSi through which line should be "drawn", where 0 represents a single day
+        static readonly IntRangeStruct _lastRsiSequence = new(1, 5);
         static readonly IntRangeStruct _rsiRange = new(7, 21);
         static readonly DoubleRangeStruct _stopLossRange = new(10, 40); // Definied as a multiplier to commission
         static readonly DoubleRangeStruct _takeProfitRange = new(40, 160); // Definied as a multiplier to commission
+
+        static readonly DoubleRangeStruct _rsiBuyLimits = new(10, 50);
+        static readonly DoubleRangeStruct _rsiSellLimits = new(50, 90);
 
         #endregion
 
@@ -60,6 +63,8 @@ namespace simple_rsi_trader
                 OptimizerInitClass optimizer = new(
                     testSize: _testSize,
                     rsiRange: _rsiRange,
+                    rsiBuyLimits: _rsiBuyLimits,
+                    rsiSellLimits: _rsiSellLimits,
                     stopLossRange: _stopLossRange,
                     takeProfitRange: _takeProfitRange,
                     data: csvReader.Data,

@@ -12,11 +12,13 @@ namespace simple_rsi_trader.Models
             int rsiPeriod,
             PointStruct stopLoss, 
             PointStruct takeProfit, 
+            PointStruct rsiLimits,
             double[] weights, 
             double[] offset,
             int indicatorLastPointSequence, 
             OperationType operation)
         {
+            RsiLimits = rsiLimits;
             RsiPeriod = rsiPeriod;
             StopLoss = stopLoss;
             TakeProfit = takeProfit;
@@ -36,9 +38,8 @@ namespace simple_rsi_trader.Models
         public int ParametersCount { get; private set; }
         public int RsiPeriod { get; private set; }
         public PointStruct StopLoss { get; private set; }
-
         public PointStruct TakeProfit { get; private set; }
-
+        public PointStruct RsiLimits { get; private set; }
         public double[] Weights { get; private set; }
 
         public void ToOptimizableArray()
