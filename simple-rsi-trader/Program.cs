@@ -26,11 +26,11 @@ namespace simple_rsi_trader
 
         static readonly IntRangeStruct _lastRsiSequence = new(1, 5);
         static readonly IntRangeStruct _rsiRange = new(7, 21);
-        static readonly DoubleRangeStruct _stopLossRange = new(10, 40); // Definied as a multiplier to commission
-        static readonly DoubleRangeStruct _takeProfitRange = new(40, 160); // Definied as a multiplier to commission
+        static readonly DoubleRangeStruct _stopLossRange = new(10, 50); // Definied as a multiplier to commission
+        static readonly DoubleRangeStruct _takeProfitRange = new(40, 240); // Definied as a multiplier to commission
 
-        static readonly DoubleRangeStruct _rsiBuyLimits = new(10, 50);
-        static readonly DoubleRangeStruct _rsiSellLimits = new(50, 90);
+        static readonly DoubleRangeStruct _rsiBuyLimits = new(10, 60);
+        static readonly DoubleRangeStruct _rsiSellLimits = new(40, 90);
 
         #endregion
 
@@ -40,13 +40,17 @@ namespace simple_rsi_trader
         static readonly DateTime _restrictByDate = new(2000, 01, 01);
         static readonly List<SignalModel> _dailyCharts = new()
         {
-            new SignalModel(name: "XAUUSD1440.csv", commission: 0.3)
+            new SignalModel(name: "XAUUSD1440.csv", commission: 0.3),
+            //new SignalModel(name: "USDJPY1440.csv", commission: 0.007),
+            //new SignalModel(name: "EURUSD1440.csv", commission: 0.00007)
         };
 
         #endregion
 
         static void Main()
         {
+            Console.Write("Use saved models [y/n]: "); 
+
             _dailyCharts.ForEach(instrument =>
             {
                 Console.WriteLine(instrument.Name);

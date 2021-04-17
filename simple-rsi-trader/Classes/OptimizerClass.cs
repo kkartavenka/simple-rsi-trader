@@ -77,9 +77,6 @@ namespace simple_rsi_trader.Classes
                 double recentRsiCut = returnVar[(int)OptimizingParameters.Weight0] - _parameter.IndicatorLastPointSequence * returnVar[(int)OptimizingParameters.Weight1];
                 if (recentRsiCut > _parameter.RsiLimits.Range.Max)
                     returnVar[(int)OptimizingParameters.Weight1] = (_parameter.RsiLimits.Range.Max - returnVar[(int)OptimizingParameters.Weight0]) / _parameter.IndicatorLastPointSequence;
-                
-                //double buySlope = _parameter.IndicatorLastPointSequence == 0 ? 0 : ((returnVar[(int)OptimizingParameters.Weight0] - _parameter.RsiLimits.Range.Min) / _parameter.IndicatorLastPointSequence);
-                //returnVar[(int)OptimizingParameters.Weight1] = buySlope;
             }
             else {
                 if (returnVar[(int)OptimizingParameters.Weight0] < _parameter.RsiLimits.Range.Min)
@@ -88,9 +85,6 @@ namespace simple_rsi_trader.Classes
                 double recentRsiCut = returnVar[(int)OptimizingParameters.Weight0] + _parameter.IndicatorLastPointSequence * returnVar[(int)OptimizingParameters.Weight1];
                 if (recentRsiCut < _parameter.RsiLimits.Range.Min)
                     returnVar[(int)OptimizingParameters.Weight1] = (returnVar[(int)OptimizingParameters.Weight0] - _parameter.RsiLimits.Range.Min) / _parameter.IndicatorLastPointSequence;
-
-                //double sellSlope = _parameter.IndicatorLastPointSequence == 0 ? 0 : ((_parameter.RsiLimits.Range.Max - returnVar[(int)OptimizingParameters.Weight0]) / _parameter.IndicatorLastPointSequence);
-                //returnVar[(int)OptimizingParameters.Weight1] = sellSlope;
             }
 
 
@@ -191,7 +185,7 @@ namespace simple_rsi_trader.Classes
 
         public void LoadSequence(SequenceClass[] sequences) => _sequences = sequences;
 
-        public void Optimize() {
+        public void Optimize(double minTrainingScore) {
             IsSuccess = false;
             Performance.Add(_executionType, new());
 
@@ -199,8 +193,7 @@ namespace simple_rsi_trader.Classes
             _executionType = ExecutionType.Train;
             _parameter.ToOptimizableArray();
 
-            if (Evaluate(_parameter.OptimizableArray) > 0) {
-                double beforeProfit = Performance[_executionType].Profit / _size;
+            if (Evaluate(_parameter.OptimizableArray) > minTrainingScore) {
                 _size = _sequences.Length;
                 function = Evaluate;
 

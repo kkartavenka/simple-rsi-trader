@@ -22,15 +22,20 @@ namespace simple_rsi_trader.Classes
 {
     public class OptimizerInitClass
     {
-        /*private const double _rsiConstantBuy = 50;
-        private const double _rsiConstantSell = 50;
-        private const double _rsiMin = 10;
-        private const double _rsiMax = 90;*/
+        private const double _actionCountRequired = 0.1;
+        private const double _profitReducer = 0.75;
+        private Dictionary<OperationType, double> _minTrainingProfitRequired = new() {
+            { OperationType.Buy, 0},
+            { OperationType.Sell, 0}
+        };
+
+        private readonly DoubleRangeStruct _scoreScalingTo = new(min: 0.25, max: 1);
 
         private readonly int _saveTop;
 
         private readonly double _commission;
         private readonly int _roundPoint;
+        
 
         private readonly DataModel[] _sourceData;
         private readonly int _testSize;
@@ -43,7 +48,7 @@ namespace simple_rsi_trader.Classes
 
         private readonly Thread _saveThread;
         private readonly ConcurrentQueue<SavedModel> _parametersQueue = new();
-        private readonly List<SavedModel> _parametersSaved = new();
+        private List<SavedModel> _parametersSaved = new();
 
         private int _modelsLeft;
 
@@ -60,21 +65,7 @@ namespace simple_rsi_trader.Classes
         private Dictionary<int, SequenceClass[]> TrainSet { get; set; } = new Dictionary<int, SequenceClass[]>();
         private Dictionary<int, SequenceClass[]> TestSet { get; set; } = new Dictionary<int, SequenceClass[]>();
 
-        public OptimizerInitClass(
-            int testSize,
-            IntRangeStruct rsiRange,
-            DoubleRangeStruct rsiBuyLimits,
-            DoubleRangeStruct rsiSellLimits,
-            DoubleRangeStruct stopLossRange,
-            DoubleRangeStruct takeProfitRange,
-            DataModel[] data,
-            IntRangeStruct lastRsiSequence,
-            int horizon,
-            DateTime restrictByDate,
-            double commission,
-            string instrument,
-            int saveTop,
-            int roundPoint) {
+        public OptimizerInitClass(int testSize, IntRangeStruct rsiRange, DoubleRangeStruct rsiBuyLimits, DoubleRangeStruct rsiSellLimits, DoubleRangeStruct stopLossRange, DoubleRangeStruct takeProfitRange, DataModel[] data, IntRangeStruct lastRsiSequence, int horizon, DateTime restrictByDate, double commission, string instrument, int saveTop, int roundPoint) {
             _rsiBuyLimits = rsiBuyLimits;
             _rsiSellLimits = rsiSellLimits;
             _saveTop = saveTop;
@@ -85,8 +76,8 @@ namespace simple_rsi_trader.Classes
             _lastRsiSequence = lastRsiSequence;
             _testSize = testSize;
             _rsiRange = rsiRange;
-            _stopLossRange = new (min: stopLossRange.Min * _commission, max: stopLossRange.Max * _commission);
-            _takeProfitRange = new (min: takeProfitRange.Min * _commission, max: takeProfitRange.Max * _commission);
+            _stopLossRange = new(min: stopLossRange.Min * _commission, max: stopLossRange.Max * _commission);
+            _takeProfitRange = new(min: takeProfitRange.Min * _commission, max: takeProfitRange.Max * _commission);
             _sourceData = data;
 
             InitializeRsi(restrictByDate);
@@ -118,10 +109,13 @@ namespace simple_rsi_trader.Classes
 
         private void DisplayResults() {
             Console.WriteLine("Optimization done");
+
             _parametersSaved.GroupBy(m => m.Parameters.Operation).ToList().ForEach(operation => {
                 Console.WriteLine(operation.Key);
 
-                IEnumerable<SavedModel> top3 = operation.ToList().OrderByDescending(m => m.TrainedPerformance.Profit).Take(3);
+                
+                IEnumerable<SavedModel> top3 = operation.ToList().OrderByDescending(m => Math.Abs(m.TrainedPerformance.Profit / (m.TrainedPerformance.Profit - m.TestedPerformance.Profit))).Take(3);
+                //IEnumerable<SavedModel> top3 = operation.ToList().OrderByDescending(m => Math.Abs(m.TrainedPerformance.Score / (m.TrainedPerformance.Score - m.TestedPerformance.Score))).Take(3);
 
                 foreach (SavedModel topModel in top3) {
                     Console.WriteLine($"Operation\t{topModel.Parameters.Operation}");
@@ -204,7 +198,7 @@ namespace simple_rsi_trader.Classes
 
             List<SavedModel> returnVar = new();
             try {
-                returnVar = JsonConvert.DeserializeObject<List<SavedModel>>(content); //JsonSerializer.Deserialize<List<SavedModel>>(content);
+                returnVar = JsonConvert.DeserializeObject<List<SavedModel>>(content);
             }
             catch (Exception exception) {
                 Console.WriteLine($"{exception.Message}");
@@ -217,21 +211,28 @@ namespace simple_rsi_trader.Classes
                 while (_parametersQueue.TryDequeue(out SavedModel newModel))
                     _parametersSaved.Add(newModel);
 
-                List<SavedModel> savedFiltered = new ();
-                _parametersSaved.GroupBy(m => m.Parameters.Operation).ToList().ForEach(row => savedFiltered.AddRange(row.OrderByDescending(m => m.TrainedPerformance.Profit).Take(_saveTop)));
+                List<SavedModel> savedFiltered = new();
+
+                _parametersSaved.GroupBy(m => m.Parameters.Operation)
+                    .ToList().ForEach(operationGroup => {
+                        List<SavedModel> operationGroupList = operationGroup.ToList();
+
+                        operationGroupList.ForEach(m => m.TestedPerformance.Score = Math.Abs(m.TrainedPerformance.Profit - m.TestedPerformance.Profit));
+
+                        DoubleRangeStruct scoreScaleFrom = new(min: operationGroupList.Min(m => m.TestedPerformance.Score), max: operationGroupList.Max(m => m.TestedPerformance.Score));
+                        operationGroupList.ForEach(m => m.TestedPerformance.Score = m.TrainedPerformance.Profit / m.TestedPerformance.Score.ScaleMinMax(observedRange: scoreScaleFrom, scale: _scoreScalingTo));
+
+                        savedFiltered.AddRange(operationGroupList.OrderByDescending(m => m.TestedPerformance.Score).Take(_saveTop));
+
+                        _minTrainingProfitRequired[operationGroup.Key] = savedFiltered.Min(m => m.TrainedPerformance.Profit) * _profitReducer;
+                    });
 
                 if (savedFiltered.Count != 0) {
-                    Console.WriteLine($"{DateTime.Now} Models left: {_modelsLeft}");
-
-                    try {
-                        File.WriteAllText(_modelFileName, JsonConvert.SerializeObject(_parametersSaved));
-                    }
-                    catch (Exception exception) {
-                        Console.WriteLine(exception.Message);
-                    }
+                    _parametersSaved = savedFiltered;
+                    SaveModels(_parametersSaved);
                 }
 
-                Thread.Sleep(5000);
+                Thread.Sleep(10000);
             }
         }
 
@@ -256,17 +257,28 @@ namespace simple_rsi_trader.Classes
 
         private void OptimizationRunner(List<ParametersModel> parameters, int degOfParal) => parameters.AsParallel().WithDegreeOfParallelism(degOfParal).ForAll(parameter => {
             OptimizerClass optimizer = new(sequences: TrainSet[parameter.RsiPeriod], parameter: parameter, commission: _commission, roundPoint: _roundPoint);
-            optimizer.Optimize();
+            optimizer.Optimize(_minTrainingProfitRequired[parameter.Operation]);
 
             if (optimizer.IsSuccess) {
                 optimizer.LoadSequence(TestSet[parameter.RsiPeriod]);
                 optimizer.Test();
 
-                if (optimizer.IsSuccess)
+                if (optimizer.IsSuccess && ((double)optimizer.Performance[ExecutionType.Test].ActionCount / _testSize) >= _actionCountRequired)
                     _parametersQueue.Enqueue(new(parameters: parameter.Copy(), tested: optimizer.Performance[ExecutionType.Test], trained: optimizer.Performance[ExecutionType.Train]));
             }
 
             _modelsLeft--;
         });
+
+        private void SaveModels(List<SavedModel> models) {
+            Console.WriteLine($"{DateTime.Now} Models left: {_modelsLeft}");
+
+            try {
+                File.WriteAllText(_modelFileName, JsonConvert.SerializeObject(models));
+            }
+            catch (Exception exception) {
+                Console.WriteLine(exception.Message);
+            }
+        }
     }
 }

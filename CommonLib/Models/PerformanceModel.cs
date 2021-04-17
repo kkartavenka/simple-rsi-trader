@@ -25,7 +25,7 @@ namespace CommonLib.Models
             WinRate = (double)WinCount / ActionCount;
             LossRate = (double)LossCount / ActionCount;
             double lossRateScaled = LossRate.ScaleMinMax(_observed, _scale);
-            Score = Profit + Profit * WinRate / lossRateScaled;
+            Score = Profit;// + Profit * WinRate / lossRateScaled;
 
             Profit /= (commission * size);
         }
