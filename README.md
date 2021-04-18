@@ -10,6 +10,11 @@ For `buy` operation a line is placed with contant being less or equal 50, and a 
 For `sell` operation a contant should be more or equal 50, and a positive slope.
 The expectations are that all the RSi points should be either above (for sell) or below the line (for buy). The maximum cut off should not exceed 90 for sell and 10 for buy operations respectively.
 
+### Flow chart
+
+![Algorithm](Data/simple-rsi-trader-algo.png)
+
+
 ### Configuration & Optimization
 
 Constant configurations are specified in SignalModel class per financial instrument individually. 

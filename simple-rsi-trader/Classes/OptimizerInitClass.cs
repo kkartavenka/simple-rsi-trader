@@ -10,10 +10,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text;
-using System.Text.Json;
 using System.Threading;
-using System.Threading.Tasks;
 using static CommonLib.Models.DataModel;
 using static simple_rsi_trader.Classes.OptimizerClass;
 using static simple_rsi_trader.Models.ParametersModel;
@@ -206,6 +203,21 @@ namespace simple_rsi_trader.Classes
             return returnVar;            
         }
 
+        private void OptimizationRunner(List<ParametersModel> parameters, int degOfParal) => parameters.AsParallel().WithDegreeOfParallelism(degOfParal).ForAll(parameter => {
+            OptimizerClass optimizer = new(sequences: TrainSet[parameter.RsiPeriod], parameter: parameter, commission: _commission, roundPoint: _roundPoint);
+            optimizer.Optimize(_minTrainingProfitRequired[parameter.Operation]);
+
+            if (optimizer.IsSuccess) {
+                optimizer.LoadSequence(TestSet[parameter.RsiPeriod]);
+                optimizer.Test();
+
+                if (optimizer.IsSuccess && ((double)optimizer.Performance[ExecutionType.Test].ActionCount / _testSize) >= _actionCountRequired)
+                    _parametersQueue.Enqueue(new(parameters: parameter.Copy(), tested: optimizer.Performance[ExecutionType.Test], trained: optimizer.Performance[ExecutionType.Train]));
+            }
+
+            _modelsLeft--;
+        });
+
         private void SaveThread() {
             while (!_completionToken) {
                 while (_parametersQueue.TryDequeue(out SavedModel newModel))
@@ -254,21 +266,6 @@ namespace simple_rsi_trader.Classes
 
             DisplayResults();
         }
-
-        private void OptimizationRunner(List<ParametersModel> parameters, int degOfParal) => parameters.AsParallel().WithDegreeOfParallelism(degOfParal).ForAll(parameter => {
-            OptimizerClass optimizer = new(sequences: TrainSet[parameter.RsiPeriod], parameter: parameter, commission: _commission, roundPoint: _roundPoint);
-            optimizer.Optimize(_minTrainingProfitRequired[parameter.Operation]);
-
-            if (optimizer.IsSuccess) {
-                optimizer.LoadSequence(TestSet[parameter.RsiPeriod]);
-                optimizer.Test();
-
-                if (optimizer.IsSuccess && ((double)optimizer.Performance[ExecutionType.Test].ActionCount / _testSize) >= _actionCountRequired)
-                    _parametersQueue.Enqueue(new(parameters: parameter.Copy(), tested: optimizer.Performance[ExecutionType.Test], trained: optimizer.Performance[ExecutionType.Train]));
-            }
-
-            _modelsLeft--;
-        });
 
         private void SaveModels(List<SavedModel> models) {
             Console.WriteLine($"{DateTime.Now} Models left: {_modelsLeft}");

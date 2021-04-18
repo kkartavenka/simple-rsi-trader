@@ -49,7 +49,8 @@ namespace simple_rsi_trader
 
         static void Main()
         {
-            Console.Write("Use saved models [y/n]: "); 
+            Console.Write("Use saved models [y/n]: ");
+            bool useModel = Console.ReadKey().KeyChar == 'y';
 
             _dailyCharts.ForEach(instrument =>
             {
