@@ -218,6 +218,24 @@ namespace simple_rsi_trader.Classes
             _modelsLeft--;
         });
 
+        public void Predict() {
+            List<SavedModel> savedModels = LoadSavedModels();
+            Console.WriteLine($"{_instrument}");
+            Console.WriteLine($"Date: {TestSet[savedModels[0].Parameters.RsiPeriod][^1].Date}");
+            Console.WriteLine($"Current close: {TestSet[0][^1].CurrentClosePrice}");
+
+            savedModels.GroupBy(m=>m.Parameters.Operation).ToList().ForEach(opGrouped => {
+                Console.WriteLine($"Operation:\t{opGrouped.Key}");
+                opGrouped.OrderByDescending(m => m.TestedPerformance.Score).Take(3).ToList().ForEach(model => {
+                    OptimizerClass optimizer = new(sequences: TrainSet[model.Parameters.RsiPeriod], parameter: model.Parameters, commission: _commission, roundPoint: _roundPoint);
+                    PredictionStruct prediction = optimizer.Predict(TestSet[model.Parameters.RsiPeriod][^1]);
+
+                    if (optimizer.IsSuccess)
+                        Console.WriteLine("");
+                });
+            });
+        }
+
         private void SaveThread() {
             while (!_completionToken) {
                 while (_parametersQueue.TryDequeue(out SavedModel newModel))

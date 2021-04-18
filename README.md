@@ -15,6 +15,11 @@ The expectations are that all the RSi points should be either above (for sell) o
 ![Algorithm](Data/simple-rsi-trader-algo.png)
 
 
+### Results
+
+The project is still in the development... 
+
+
 ### Configuration & Optimization
 
 Constant configurations are specified in SignalModel class per financial instrument individually. 

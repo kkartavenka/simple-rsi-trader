@@ -54,7 +54,7 @@ namespace simple_rsi_trader
 
             _dailyCharts.ForEach(instrument =>
             {
-                Console.WriteLine(instrument.Name);
+                Console.WriteLine($"{Environment.NewLine}{instrument.Name}");
 
                 CsvReaderClass csvReader = new(
                     fileName: Path.Combine(_dirDataPath, instrument.Name),
@@ -81,7 +81,10 @@ namespace simple_rsi_trader
                     saveTop: _saveTopModelCount,
                     roundPoint: csvReader.RoundPoint);
 
-                optimizer.StartOptimization(randomInitCount: _randomInitCount, degreeOfParallelism: _degreeOfParallelism);
+                if (!useModel)
+                    optimizer.StartOptimization(randomInitCount: _randomInitCount, degreeOfParallelism: _degreeOfParallelism);
+                else
+                    optimizer.Predict();
             });
         }
 

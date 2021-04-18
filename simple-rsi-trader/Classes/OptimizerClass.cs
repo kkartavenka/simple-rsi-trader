@@ -149,6 +149,10 @@ namespace simple_rsi_trader.Classes
             return Performance[_executionType].Score;
         }
 
+        private double GetOrder(SequenceClass sequence, double[] weights) => _parameter.Operation == OperationType.Sell?
+            sequence.CurrentClosePrice + weights[(int)OptimizingParameters.Offset0] - weights[(int)OptimizingParameters.Offset1] * sequence.RsiSequence[^1]:
+            sequence.CurrentClosePrice - weights[(int)OptimizingParameters.Offset0] + weights[(int)OptimizingParameters.Offset1] * (100 - sequence.RsiSequence[^1]);
+
         private (double profit, ActionOutcome outcome) GetProfitFromOrder(OrderModel prediction, double stopLoss, double takeProfit) {
             if (_parameter.Operation == OperationType.Buy) {
                 if (prediction.Order > prediction.Low + _commission / 2d && prediction.Order < prediction.LowestPrice - _commission / 2d + stopLoss) {
@@ -211,6 +215,20 @@ namespace simple_rsi_trader.Classes
                 }
             }
 
+        }
+
+        public PredictionStruct Predict(SequenceClass sequence) {
+            _parameter.ToOptimizableArray();
+            if (AllowOperation(sequence, _parameter.OptimizableArray)) {
+                IsSuccess = true;
+                return new PredictionStruct(
+                    limitOrder: Math.Round(GetOrder(sequence, _parameter.OptimizableArray), _roundPoint),
+                    stopLoss: _parameter.StopLoss.Value,
+                    takeProfit: _parameter.TakeProfit.Value);
+            }
+
+            IsSuccess = false;
+            return new PredictionStruct();
         }
 
         public void Test() {
