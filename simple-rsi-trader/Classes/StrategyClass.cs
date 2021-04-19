@@ -55,6 +55,7 @@ namespace simple_rsi_trader.Classes
                         }
                     }
                 }
+                returnVar = returnVar.OrderBy(m => m.LimitOrder).ToList();
             }
             else {
                 preparedOrders = preparedOrders.OrderByDescending(m => m.LimitOrder).ThenByDescending(m => m.StopLoss).ToList();
@@ -74,6 +75,7 @@ namespace simple_rsi_trader.Classes
                         }
                     }
                 }
+                returnVar = returnVar.OrderByDescending(m => m.LimitOrder).ToList();
             }
 
             return returnVar;
@@ -84,7 +86,8 @@ namespace simple_rsi_trader.Classes
         public void LoadSequence(Dictionary<int, SequenceClass> predictionSet) => _predictionSet = predictionSet;
 
         public void PredictLast() {
-            GetPredictions(_predictionSet);
+            List<PredictionStruct> predictions = GetPredictions(_predictionSet);
+            predictions.ForEach(row => Console.WriteLine($"Limit order: {row.LimitOrder}\tStop loss: {row.StopLoss}\tTakeProfit: {row.TakeProfit}"));
         }
 
         public void Test() {

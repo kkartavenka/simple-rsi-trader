@@ -244,13 +244,10 @@ namespace simple_rsi_trader.Classes
 
             savedModels.GroupBy(m => m.Parameters.Operation).ToList().ForEach(opGrouped => {
                 Console.WriteLine($"Operation:\t{opGrouped.Key}");
-                opGrouped.OrderByDescending(m => m.TestedPerformance.Score).Take(3).ToList().ForEach(model => {
-                    OptimizerClass optimizer = new(sequences: TrainSet[model.Parameters.RsiPeriod], parameter: model.Parameters, commission: _commission, roundPoint: _roundPoint);
-                    PredictionStruct prediction = optimizer.Predict(LastPrice[model.Parameters.RsiPeriod]);
-
-                    if (optimizer.IsSuccess)
-                        Console.WriteLine($"Limit Order: {prediction.LimitOrder}\tTake Profit: {prediction.TakeProfit}\tStop Loss: {prediction.StopLoss}");
-                });
+                IEnumerable<SavedModel> models = opGrouped.OrderByDescending(m => m.TestedPerformance.Score).Take(_useForTest);
+                StrategyClass strategy = new(models: models, operation: opGrouped.Key, roundPoint: _roundPoint, commission: _commission);
+                strategy.LoadSequence(LastPrice);
+                strategy.PredictLast();
             });
         }
 
