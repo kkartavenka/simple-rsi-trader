@@ -18,7 +18,9 @@ namespace simple_rsi_trader
 
         static readonly int _horizon = 1;
         static readonly int _testSize = 50;
+        static readonly int _validationSize = 50;
         static readonly int _randomInitCount = 100000;
+        static readonly int _useForTest = 3;
 
         #endregion
 
@@ -67,6 +69,8 @@ namespace simple_rsi_trader
 
                 OptimizerInitClass optimizer = new(
                     testSize: _testSize,
+                    validationSize: _validationSize,
+                    useForTest: _useForTest,
                     rsiRange: _rsiRange,
                     rsiBuyLimits: _rsiBuyLimits,
                     rsiSellLimits: _rsiSellLimits,

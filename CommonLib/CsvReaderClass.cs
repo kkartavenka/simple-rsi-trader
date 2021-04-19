@@ -61,6 +61,8 @@ namespace CommonLib
                 .OrderBy(m => m.Date)
                 .Where(m => m.Date >= restrictDate)
                 .ToList();
+
+            RoundPoint--;
         }
 
         public void PrepareSourceData(int dataArraySize, bool cleanUp, int cleanUpWindowSize = 20)

@@ -9,9 +9,9 @@ namespace simple_rsi_trader.Models
             TestedPerformance = tested;
             TrainedPerformance = trained;
         }
-        public ParametersModel Parameters { get; private set; }
-        public PerformanceModel TestedPerformance { get; private set; }
-        public PerformanceModel TrainedPerformance { get; private set; } 
+        public ParametersModel Parameters { get; set; }
+        public PerformanceModel TestedPerformance { get; set; }
+        public PerformanceModel TrainedPerformance { get; set; } 
         
     }
 }

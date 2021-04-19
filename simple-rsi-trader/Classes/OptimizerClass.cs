@@ -3,16 +3,13 @@ using CommonLib.Models;
 using simple_rsi_trader.Models;
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using static simple_rsi_trader.Classes.OperationClass;
 using static simple_rsi_trader.Models.ParametersModel;
 
 namespace simple_rsi_trader.Classes
 {
     public class OptimizerClass
     {
-        private enum ActionOutcome : short { Success = 1, Failed = 0, NoAction = -1 };
         public enum ExecutionType : short { Train = 0, Test = 1 };
 
         private const double _preQualifyFraction = 0.5;
@@ -34,28 +31,6 @@ namespace simple_rsi_trader.Classes
 
         Func<double[], double> function;
         public Dictionary<ExecutionType, PerformanceModel> Performance { get; private set; } = new();
-
-        private bool AllowOperation(SequenceClass sequence, double[] weights) {
-            bool returnVar = true;
-            double[] rsiSequence = sequence.RsiSequence[^_parameter.IndicatorLastPointSequence..];
-
-            for (int i = 0; i < rsiSequence.Length; i++) {
-                if (_parameter.Operation == OperationType.Buy) {
-                    if (weights[(int)OptimizingParameters.Weight0] - weights[(int)OptimizingParameters.Weight1] * i < rsiSequence[i]) {
-                        returnVar = false;
-                        break;
-                    }
-                }
-                else {
-                    if (weights[(int)OptimizingParameters.Weight0] + weights[(int)OptimizingParameters.Weight1] * i > rsiSequence[i]) {
-                        returnVar = false;
-                        break;
-                    }
-                }
-            }
-
-            return returnVar;
-        }
 
         private double[] EnforceConstrains(double[] weights) {
             double[] returnVar = weights;
@@ -99,24 +74,15 @@ namespace simple_rsi_trader.Classes
                 weights = EnforceConstrains(weights);
             }
 
+            if (_roundOrder) {
+                weights[(int)OptimizingParameters.StopLoss] = Math.Round(weights[(int)OptimizingParameters.StopLoss], _roundPoint);
+                weights[(int)OptimizingParameters.TakeProfit] = Math.Round(weights[(int)OptimizingParameters.TakeProfit], _roundPoint);
+            }
+
             for (int i = 0; i < _size; i++) {
-                if (AllowOperation(sequence: _sequences[i], weights: weights)) {
-                    double limitOrder;
-
-                    if(_parameter.Operation == OperationType.Sell) {
-                        limitOrder = _sequences[i].CurrentClosePrice
-                            + weights[(int)OptimizingParameters.Offset0]
-                            - weights[(int)OptimizingParameters.Offset1] * _sequences[i].RsiSequence[^1];
-                    }
-                    else {
-                        limitOrder = _sequences[i].CurrentClosePrice
-                            - weights[(int)OptimizingParameters.Offset0]
-                            + weights[(int)OptimizingParameters.Offset1] * (100 - _sequences[i].RsiSequence[^1]);
-                    }
-
-                    if (_roundOrder)
-                        limitOrder = Math.Round(limitOrder, _roundPoint);
-
+                if (_sequences[i].CheckActivation(weights, _parameter)) {
+                    double limitOrder = _sequences[i].GetLimitOrder(weights, _parameter, _roundOrder, _roundPoint);
+                    
                     OrderModel order = new (
                         close: _sequences[i].CurrentClosePrice,
                         order: limitOrder,
@@ -125,9 +91,9 @@ namespace simple_rsi_trader.Classes
                         high: _sequences[i].HighestPrice,
                         highestPrice: _sequences[i].HighestPrice);
 
-                    (double profit, ActionOutcome outcome) = GetProfitFromOrder(order, weights[(int)OptimizingParameters.StopLoss], weights[(int)OptimizingParameters.StopLoss]);
+                    (double profit, ActionOutcome outcome) = order.AssessProfitFromOrder(_parameter.Operation, weights[(int)OptimizingParameters.StopLoss], weights[(int)OptimizingParameters.TakeProfit], _commission); // GetProfitFromOrder(order, weights[(int)OptimizingParameters.StopLoss], weights[(int)OptimizingParameters.TakeProfit]);
 
-                    switch(outcome) {
+                    switch (outcome) {
                         case ActionOutcome.Failed:
                             Performance[_executionType].ActionCount++;
                             Performance[_executionType].LossCount++;
@@ -153,7 +119,7 @@ namespace simple_rsi_trader.Classes
             sequence.CurrentClosePrice + weights[(int)OptimizingParameters.Offset0] - weights[(int)OptimizingParameters.Offset1] * sequence.RsiSequence[^1]:
             sequence.CurrentClosePrice - weights[(int)OptimizingParameters.Offset0] + weights[(int)OptimizingParameters.Offset1] * (100 - sequence.RsiSequence[^1]);
 
-        private (double profit, ActionOutcome outcome) GetProfitFromOrder(OrderModel prediction, double stopLoss, double takeProfit) {
+        /*private (double profit, ActionOutcome outcome) GetProfitFromOrder(OrderModel prediction, double stopLoss, double takeProfit) {
             if (_parameter.Operation == OperationType.Buy) {
                 if (prediction.Order > prediction.Low + _commission / 2d && prediction.Order < prediction.LowestPrice - _commission / 2d + stopLoss) {
                     
@@ -185,7 +151,7 @@ namespace simple_rsi_trader.Classes
                     return ((-1) * (stopLoss + _commission / 2d), ActionOutcome.Failed);
             }
             return (0, ActionOutcome.NoAction);
-        }
+        }*/
 
         public void LoadSequence(SequenceClass[] sequences) => _sequences = sequences;
 
@@ -219,7 +185,7 @@ namespace simple_rsi_trader.Classes
 
         public PredictionStruct Predict(SequenceClass sequence) {
             _parameter.ToOptimizableArray();
-            if (AllowOperation(sequence, _parameter.OptimizableArray)) {
+            if (sequence.CheckActivation(_parameter.OptimizableArray, _parameter)) {
                 IsSuccess = true;
                 return new PredictionStruct(
                     limitOrder: Math.Round(GetOrder(sequence, _parameter.OptimizableArray), _roundPoint),
@@ -231,7 +197,7 @@ namespace simple_rsi_trader.Classes
             return new PredictionStruct();
         }
 
-        public void Test() {
+        public void Validate() {
             IsSuccess = false;
 
             _executionType = ExecutionType.Test;

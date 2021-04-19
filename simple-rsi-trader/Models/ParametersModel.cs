@@ -30,17 +30,17 @@ namespace simple_rsi_trader.Models
             ParametersCount = _fixedOffset + weights.Length + Offset.Length;
         }
 
-        public int IndicatorLastPointSequence { get; private set; }
+        public int IndicatorLastPointSequence { get; set; }
 
-        public double[] Offset { get; private set; }
-        public OperationType Operation { get; private set; }
+        public double[] Offset { get; set; }
+        public OperationType Operation { get; set; }
         public double[] OptimizableArray { get; set; }
-        public int ParametersCount { get; private set; }
-        public int RsiPeriod { get; private set; }
-        public PointStruct StopLoss { get; private set; }
-        public PointStruct TakeProfit { get; private set; }
-        public PointStruct RsiLimits { get; private set; }
-        public double[] Weights { get; private set; }
+        public int ParametersCount { get; set; }
+        public int RsiPeriod { get; set; }
+        public PointStruct StopLoss { get; set; }
+        public PointStruct TakeProfit { get; set; }
+        public PointStruct RsiLimits { get; set; }
+        public double[] Weights { get; set; }
 
         public void ToOptimizableArray()
         {
