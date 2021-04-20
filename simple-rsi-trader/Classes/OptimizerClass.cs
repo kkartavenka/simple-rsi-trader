@@ -119,40 +119,6 @@ namespace simple_rsi_trader.Classes
             sequence.CurrentClosePrice + weights[(int)OptimizingParameters.Offset0] - weights[(int)OptimizingParameters.Offset1] * sequence.RsiSequence[^1]:
             sequence.CurrentClosePrice - weights[(int)OptimizingParameters.Offset0] + weights[(int)OptimizingParameters.Offset1] * (100 - sequence.RsiSequence[^1]);
 
-        /*private (double profit, ActionOutcome outcome) GetProfitFromOrder(OrderModel prediction, double stopLoss, double takeProfit) {
-            if (_parameter.Operation == OperationType.Buy) {
-                if (prediction.Order > prediction.Low + _commission / 2d && prediction.Order < prediction.LowestPrice - _commission / 2d + stopLoss) {
-                    
-                    double distance = prediction.Close - prediction.Order;
-
-                    double profit = distance < takeProfit ? distance - _commission / 2d : takeProfit - _commission / 2d;
-
-                    if (profit > 0)
-                        return (profit, ActionOutcome.Success);
-                    else
-                        return (profit, ActionOutcome.Failed);
-                }
-                else if (prediction.Order >= prediction.Low + _commission / 2d + stopLoss)
-                    return ((-1) * (stopLoss + _commission / 2d), ActionOutcome.Failed);
-            }
-            else {
-                if (prediction.Order < prediction.High - _commission / 2d && prediction.Order > prediction.HighestPrice + _commission / 2d - stopLoss) {
-                    
-                    double distance = prediction.Order - prediction.Close;
-
-                    double profit = distance < takeProfit ? distance - _commission / 2d : takeProfit - _commission / 2d;
-
-                    if (profit > 0)
-                        return (profit, ActionOutcome.Success);
-                    else
-                        return (profit, ActionOutcome.Failed);
-                }
-                else if (prediction.Order <= prediction.High + _commission / 2d - stopLoss)
-                    return ((-1) * (stopLoss + _commission / 2d), ActionOutcome.Failed);
-            }
-            return (0, ActionOutcome.NoAction);
-        }*/
-
         public void LoadSequence(SequenceClass[] sequences) => _sequences = sequences;
 
         public void Optimize(double minTrainingScore) {
@@ -163,7 +129,8 @@ namespace simple_rsi_trader.Classes
             _executionType = ExecutionType.Train;
             _parameter.ToOptimizableArray();
 
-            if (Evaluate(_parameter.OptimizableArray) > minTrainingScore) {
+            double preTrainScore = Evaluate(_parameter.OptimizableArray);
+            if (preTrainScore > minTrainingScore) {
                 _size = _sequences.Length;
                 function = Evaluate;
 

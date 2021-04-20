@@ -26,7 +26,7 @@ namespace simple_rsi_trader.Classes
             { OperationType.Sell, 0}
         };
 
-        private readonly DoubleRangeStruct _scoreScalingTo = new(min: 0.25, max: 1);
+        private readonly DoubleRangeStruct _scoreScalingTo = new(min: 0.5, max: 1);
 
         private readonly int _saveTop;
 
@@ -130,7 +130,7 @@ namespace simple_rsi_trader.Classes
                 strategy.LoadSequences(TestSet);
                 strategy.Test();
 
-                Console.WriteLine($"Total profit: {strategy.Profit}");
+                Console.WriteLine($"Total profit: {(strategy.Profit / _commission):N3}");
 
                 foreach (SavedModel topModel in top) {
                     Console.WriteLine($"Operation\t{topModel.Parameters.Operation}");
@@ -191,7 +191,7 @@ namespace simple_rsi_trader.Classes
                 RsiClass rsi = new(period: i);
                 DataModel[] data = _sourceData.Copy();
 
-                data = rsi.GetRSi(data, (int)DataColumn.Close, (int)DataColumn.Rsi);
+                data = rsi.GetRSiOriginal(data, (int)DataColumn.Close, (int)DataColumn.Rsi);
                 data = data
                     .Where(m => m.Date >= restrictByDate)
                     .OrderBy(m => m.Date)
@@ -269,7 +269,7 @@ namespace simple_rsi_trader.Classes
 
                         savedFiltered.AddRange(operationGroupList.OrderByDescending(m => m.TestedPerformance.Score).Take(_saveTop));
 
-                        _minTrainingProfitRequired[operationGroup.Key] = savedFiltered.Min(m => m.TrainedPerformance.Profit) * _profitReducer;
+                        _minTrainingProfitRequired[operationGroup.Key] = savedFiltered.Min(m => (m.TrainedPerformance.Profit + m.TestedPerformance.Profit) / 2) * _profitReducer;
                     });
 
                 if (savedFiltered.Count != 0) {

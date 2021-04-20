@@ -18,16 +18,16 @@ namespace simple_rsi_trader
 
         static readonly int _horizon = 1;
         static readonly int _testSize = 50;
-        static readonly int _validationSize = 50;
-        static readonly int _randomInitCount = 100000;
-        static readonly int _useForTest = 3;
+        static readonly int _validationSize = 100;
+        static readonly int _randomInitCount = 150000;
+        static readonly int _useForTest = 5;
 
         #endregion
 
         #region Parameters range setup
 
         static readonly IntRangeStruct _lastRsiSequence = new(1, 5);
-        static readonly IntRangeStruct _rsiRange = new(7, 21);
+        static readonly IntRangeStruct _rsiRange = new(7, 40);
 
         static readonly DoubleRangeStruct _rsiBuyLimits = new(10, 60);
         static readonly DoubleRangeStruct _rsiSellLimits = new(40, 90);
@@ -40,9 +40,10 @@ namespace simple_rsi_trader
         static readonly DateTime _restrictByDate = new(2000, 01, 01);
         static readonly List<SignalModel> _dailyCharts = new()
         {
-            new SignalModel(name: "XAUUSD1440.csv", commission: 0.3, stopLossRange: new(10, 50), takeProfitRange: new(40, 240)),
-            new SignalModel(name: "USDJPY1440.csv", commission: 0.007, stopLossRange: new(10, 50), takeProfitRange: new(40, 240)),
-            new SignalModel(name: "EURUSD1440.csv", commission: 0.00007, stopLossRange: new(10, 50), takeProfitRange: new(40, 240))
+            new SignalModel(name: "XAUUSD1440.csv", commission: 0.3, stopLossRange: new(10, 50), takeProfitRange: new(40, 200)),
+            new SignalModel(name: "USDJPY1440.csv", commission: 0.007, stopLossRange: new(10, 40), takeProfitRange: new(40, 200)),
+            new SignalModel(name: "EURUSD1440.csv", commission: 0.00007, stopLossRange: new(10, 100), takeProfitRange: new(40, 200)),
+            new SignalModel(name: "NATGAS1440.csv", commission: 0.003, stopLossRange: new(10, 70), takeProfitRange: new(40, 400))
         };
 
         #endregion

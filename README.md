@@ -1,6 +1,6 @@
-## Simple RSi Trader
+# Simple RSi Trader
 
-### Hypothesis
+## Hypothesis
 
 A simple approach for a limit order inter-period trader for a derivative market. 
 The idea is to place a limit order at the start of the period, specifying stop loss and take profit. Once period is over -- close the order whether profit or loss. 
@@ -10,17 +10,19 @@ For `buy` operation a line is placed with contant being less or equal 50, and a 
 For `sell` operation a contant should be more or equal 50, and a positive slope.
 The expectations are that all the RSi points should be either above (for sell) or below the line (for buy). The maximum cut off should not exceed 90 for sell and 10 for buy operations respectively.
 
-### Flow chart
+## Flow chart
 
 ![Algorithm](Data/simple-rsi-trader-algo.png)
 
 
-### Results
+## Results
 
-The project is still in the development... 
+The project is still under the development... 
+
+Success measurement: sum of difference in price change divided by commission value for normalization.
 
 
-### Configuration & Optimization
+## Configuration & Optimization
 
 Constant configurations are specified in SignalModel class per financial instrument individually. 
 
