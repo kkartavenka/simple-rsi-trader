@@ -1,18 +1,22 @@
-﻿using Microsoft.Data.Sqlite;
-using System;
+﻿using CommonLib.Models;
+using CommonLib.Models.Export;
+using Microsoft.Data.Sqlite;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace CommonLib.Classes
 {
     public class SqliteExportClass
     {
+        private const string _instrumentDataTable = @"instrument_data";
+        private const string _predictionTable = @"prediction_data";
+
         private readonly string _filename;
+        private readonly string _connectionString;
         public SqliteExportClass(string filename) {
             _filename = $"{filename}.db";
+            _connectionString = $"Data Source={_filename}";
             EnsureCreated();
         }
 
@@ -20,18 +24,39 @@ namespace CommonLib.Classes
             if (File.Exists(_filename))
                 File.Delete(_filename);
 
-            using var connection = new SqliteConnection($"Data Source={_filename}");
+            string sqlQuery = 
+                $"CREATE TABLE {_instrumentDataTable} (id INTEGER PRIMARY KEY, date_time TEXT NOT NULL, open REAL NOT NULL, high REAL NOT NULL, low REAL NOT NULL, close REAL NOT NULL, typical_price REAL NOT NULL, volume REAL NOT NULL);" +
+                $"CREATE TABLE {_predictionTable} (id INTEGER PRIMARY KEY, instrument_data_id INTEGER NOT NULL, limit_order REAL NOT NULL, stop_loss REAL NOT NULL, take_profit REAL NOT NULL);";
+
+            ExecuteNonQuery(sqlQuery);
+        }
+
+        public void ExecuteNonQuery(string sqlQuery) {
+            using var connection = new SqliteConnection(_connectionString);
             connection.Open();
 
-            var command = connection.CreateCommand();
-            command.CommandText = @"CREATE TABLE instrument_data (id INTEGER PRIMARY KEY, date_time TEXT, open REAL, high REAL, low REAL, close REAL, typical_price REAL, volume REAL);
-                                    CREATE TABLE prediction_data (id INTEGER PRIMARY KEY, instrument_data_id INTEGER, limit_order REAL, stop_loss REAL, take_profit REAL);";
+            using var command = connection.CreateCommand();
+            command.CommandText = sqlQuery;
 
             command.ExecuteNonQuery();
             command.Dispose();
 
             connection.Close();
             connection.Dispose();
+        }
+
+        public void PushInstrumentData(DataModel[] data) {
+            string insertedValues = string.Join(',', data.Select(m => $"({m.ToSqliteRow()})"));
+            string sqlQuery = $"INSERT INTO {_instrumentDataTable} (id, date_time, open, high, low, close, typical_price, volume) VALUES {insertedValues}";
+
+            ExecuteNonQuery(sqlQuery);
+        }
+
+        public void PushPredictions(List<PredictionModel> predictions) {
+            string insertedValues = string.Join(',', predictions.Select(m => $"({m.ToSqliteRow()})"));
+            string sqlQuery = $"INSERT INTO {_predictionTable} (id, limit_order, stop_loss, take_profit) VALUES {insertedValues};";
+
+            ExecuteNonQuery(sqlQuery);
         }
     }
 }
