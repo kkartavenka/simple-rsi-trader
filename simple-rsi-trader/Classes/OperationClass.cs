@@ -94,12 +94,12 @@ namespace simple_rsi_trader.Classes
                 return new PredictionStruct(
                     limitOrder: limitOrder,
                     stopLoss: Math.Round(limitOrder + weights[(int)OptimizingParameters.StopLoss], roundPoint),
-                    takeProfit: Math.Round(limitOrder - weights[(int)OptimizingParameters.StopLoss], roundPoint));
+                    takeProfit: Math.Round(limitOrder - weights[(int)OptimizingParameters.TakeProfit], roundPoint));
             else
                 return new PredictionStruct(
                     limitOrder: limitOrder,
                     stopLoss: Math.Round(limitOrder - weights[(int)OptimizingParameters.StopLoss], roundPoint),
-                    takeProfit: Math.Round(limitOrder + weights[(int)OptimizingParameters.StopLoss], roundPoint));
+                    takeProfit: Math.Round(limitOrder + weights[(int)OptimizingParameters.TakeProfit], roundPoint));
         }
     }
 }

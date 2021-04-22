@@ -26,7 +26,7 @@ namespace simple_rsi_trader.Classes
             { OperationType.Sell, 0}
         };
 
-        private readonly DoubleRangeStruct _scoreScalingTo = new(min: 0.5, max: 1);
+        private readonly DoubleRangeStruct _scoreScalingTo = new(min: 0.5, max: 0.75);
 
         private readonly int _saveTop;
 
@@ -85,7 +85,7 @@ namespace simple_rsi_trader.Classes
             InitializeRsi(restrictByDate);
             CreateSequences();
 
-            _modelFileName = $"{_instrument}.trained";
+            _modelFileName = $"{_instrument}.{_horizon}.trained";
 
             _saveThread = new Thread(new ThreadStart(SaveThread));
             _saveThread.Start();
@@ -265,7 +265,7 @@ namespace simple_rsi_trader.Classes
                         operationGroupList.ForEach(m => m.TestedPerformance.Score = Math.Abs(m.TrainedPerformance.Profit - m.TestedPerformance.Profit));
 
                         DoubleRangeStruct scoreScaleFrom = new(min: operationGroupList.Min(m => m.TestedPerformance.Score), max: operationGroupList.Max(m => m.TestedPerformance.Score));
-                        operationGroupList.ForEach(m => m.TestedPerformance.Score = m.TrainedPerformance.Profit / m.TestedPerformance.Score.ScaleMinMax(observedRange: scoreScaleFrom, scale: _scoreScalingTo));
+                        operationGroupList.ForEach(m => m.TestedPerformance.Score = (0.4 * m.TestedPerformance.Profit + 0.6 * m.TrainedPerformance.Profit) / m.TestedPerformance.Score.ScaleMinMax(observedRange: scoreScaleFrom, scale: _scoreScalingTo));
 
                         savedFiltered.AddRange(operationGroupList.OrderByDescending(m => m.TestedPerformance.Score).Take(_saveTop));
 

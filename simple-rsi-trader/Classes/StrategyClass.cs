@@ -3,8 +3,6 @@ using simple_rsi_trader.Models;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using static simple_rsi_trader.Classes.OperationClass;
 using static simple_rsi_trader.Models.ParametersModel;
 

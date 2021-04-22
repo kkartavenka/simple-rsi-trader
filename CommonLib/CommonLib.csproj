@@ -6,6 +6,7 @@
 
   <ItemGroup>
     <PackageReference Include="Accord.Statistics" Version="3.8.2-alpha" />
+    <PackageReference Include="Microsoft.Data.Sqlite.Core" Version="5.0.5" />
   </ItemGroup>
 
 </Project>

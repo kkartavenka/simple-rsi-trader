@@ -15,12 +15,13 @@ namespace CommonLib.Models
             Rsi = 6
         };
 
-        public DataModel(double[] data, DateTime date)
+        public DataModel(double[] data, DateTime date, int id)
         {
+            Id = id;
             Data = data;
             Date = date;
         }
-
+        public int Id { get; private set; }
         public DateTime Date { get; private set; }
         public double[] Data { get; set; }
     }

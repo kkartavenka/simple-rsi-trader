@@ -1,9 +1,6 @@
 ﻿using CommonLib.Models;
 using System;
-using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using static CommonLib.Models.DataModel;
 
 #nullable enable
@@ -16,6 +13,7 @@ namespace simple_rsi_trader.Classes
         public SequenceClass(DataModel[] before, DataModel[]? after)
         {
             CurrentClosePrice = before[^1].Data[(int)DataColumn.Close];
+            Id = before[^1].Id;
             Date = before[^1].Date;
 
             RsiSequence = before.Select(m => m.Data[(int)DataColumn.Rsi]).ToArray();
@@ -46,6 +44,8 @@ namespace simple_rsi_trader.Classes
         public double HighChange { get; private set; }
         public double HighestPrice { get; private set; }
         public double HighPrice { get; private set; }
+
+        public int Id { get; private set; }
 
         public double LowChange { get; private set; }
         public double LowPrice { get; private set; }

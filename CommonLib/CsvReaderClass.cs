@@ -124,7 +124,7 @@ namespace CommonLib
                 dataArray[(int)DataColumn.TypicalPrice] = Ohlc[j].TypicalPrice;
                 dataArray[(int)DataColumn.Volume] = Ohlc[j].Volume;
 
-                returnModel[j] = new DataModel(data: dataArray, date: Ohlc[j].Date);
+                returnModel[j] = new DataModel(data: dataArray, date: Ohlc[j].Date, id: j);
             }
 
             return returnModel;

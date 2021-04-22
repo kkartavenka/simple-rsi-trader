@@ -16,10 +16,10 @@ namespace simple_rsi_trader
 
         #region Training and validation
 
-        static readonly int _horizon = 1;
+        static int _horizon = 1;
         static readonly int _testSize = 50;
         static readonly int _validationSize = 100;
-        static readonly int _randomInitCount = 150000;
+        static readonly int _randomInitCount = 3000000;
         static readonly int _useForTest = 5;
 
         #endregion
@@ -40,16 +40,21 @@ namespace simple_rsi_trader
         static readonly DateTime _restrictByDate = new(2000, 01, 01);
         static readonly List<SignalModel> _dailyCharts = new()
         {
-            new SignalModel(name: "XAUUSD1440.csv", commission: 0.3, stopLossRange: new(10, 50), takeProfitRange: new(40, 200)),
-            new SignalModel(name: "USDJPY1440.csv", commission: 0.007, stopLossRange: new(10, 40), takeProfitRange: new(40, 200)),
-            new SignalModel(name: "EURUSD1440.csv", commission: 0.00007, stopLossRange: new(10, 100), takeProfitRange: new(40, 200)),
-            new SignalModel(name: "NATGAS1440.csv", commission: 0.003, stopLossRange: new(10, 70), takeProfitRange: new(40, 400))
+            new SignalModel(name: "USDJPY1440.csv", commission: 0.007, stopLossRange: new(10, 40), takeProfitRange: new(40, 400)),
+            new SignalModel(name: "EURUSD1440.csv", commission: 0.00007, stopLossRange: new(10, 60), takeProfitRange: new(60, 500)),
+            new SignalModel(name: "NATGAS1440.csv", commission: 0.003, stopLossRange: new(10, 30), takeProfitRange: new(30, 500)),
+            new SignalModel(name: "XPDUSD1440.csv", commission: 4.31, stopLossRange: new(3, 10), takeProfitRange: new(10, 200)),
+            new SignalModel(name: "XAUUSD1440.csv", commission: 0.3, stopLossRange: new(10, 40), takeProfitRange: new(50, 400)),
         };
 
         #endregion
 
         static void Main()
         {
+            Console.Write("Horizon: ");
+            if (int.TryParse(Console.ReadLine(), out int newHorizon))
+                _horizon = newHorizon;
+
             Console.Write("Use saved models [y/n]: ");
             bool useModel = Console.ReadKey().KeyChar == 'y';
 
