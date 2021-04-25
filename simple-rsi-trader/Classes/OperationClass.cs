@@ -16,6 +16,11 @@ namespace simple_rsi_trader.Classes
 
                     double distance = prediction.Close - prediction.Order;
 
+                    if (prediction.HighestPrice > prediction.High)
+                        distance = prediction.HighestPrice - prediction.Order - commission / 2d;
+
+
+                    //double profit = distance < takeProfit ? distance - commission / 2d : takeProfit - commission / 2d;
                     double profit = distance < takeProfit ? distance - commission / 2d : takeProfit - commission / 2d;
 
                     if (profit > 0)
@@ -30,6 +35,9 @@ namespace simple_rsi_trader.Classes
                 if (prediction.Order < prediction.High - commission / 2d && prediction.Order > prediction.HighestPrice + commission / 2d - stopLoss) {
 
                     double distance = prediction.Order - prediction.Close;
+
+                    if (prediction.LowestPrice < prediction.Low)
+                        distance = prediction.Order - prediction.LowestPrice - commission / 2d;
 
                     double profit = distance < takeProfit ? distance - commission / 2d : takeProfit - commission / 2d;
 

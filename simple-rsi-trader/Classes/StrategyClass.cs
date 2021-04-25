@@ -103,7 +103,7 @@ namespace simple_rsi_trader.Classes
 
                 predictions.ForEach(prediction => {
                     OrderModel order = new(
-                        close: sequence.CurrentClosePrice,
+                        close: sequence.LatestClosePrice,
                         order: prediction.LimitOrder,
                         low: sequence.LowestPrice,
                         high: sequence.HighestPrice,

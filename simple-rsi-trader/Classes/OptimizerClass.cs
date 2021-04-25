@@ -84,14 +84,18 @@ namespace simple_rsi_trader.Classes
                     double limitOrder = _sequences[i].GetLimitOrder(weights, _parameter, _roundOrder, _roundPoint);
                     
                     OrderModel order = new (
-                        close: _sequences[i].CurrentClosePrice,
+                        close: _sequences[i].LatestClosePrice, //_sequences[i].CurrentClosePrice,
                         order: limitOrder,
                         low: _sequences[i].LowPrice,
                         lowestPrice: _sequences[i].LowestPrice,
                         high: _sequences[i].HighestPrice,
                         highestPrice: _sequences[i].HighestPrice);
 
-                    (double profit, ActionOutcome outcome) = order.AssessProfitFromOrder(_parameter.Operation, weights[(int)OptimizingParameters.StopLoss], weights[(int)OptimizingParameters.TakeProfit], _commission); // GetProfitFromOrder(order, weights[(int)OptimizingParameters.StopLoss], weights[(int)OptimizingParameters.TakeProfit]);
+                    (double profit, ActionOutcome outcome) = order.AssessProfitFromOrder(
+                        operation: _parameter.Operation,
+                        stopLoss: weights[(int)OptimizingParameters.StopLoss],
+                        takeProfit: weights[(int)OptimizingParameters.TakeProfit],
+                        commission: _commission); // GetProfitFromOrder(order, weights[(int)OptimizingParameters.StopLoss], weights[(int)OptimizingParameters.TakeProfit]);
 
                     switch (outcome) {
                         case ActionOutcome.Failed:
