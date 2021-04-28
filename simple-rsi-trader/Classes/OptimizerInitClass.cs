@@ -1,4 +1,5 @@
-﻿using CommonLib.Classes.DeepCopy;
+﻿using Accord.Statistics.Models.Regression.Linear;
+using CommonLib.Classes.DeepCopy;
 using CommonLib.Extensions;
 using CommonLib.Indicators;
 using CommonLib.Models;
@@ -33,6 +34,7 @@ namespace simple_rsi_trader.Classes
         private readonly double _commission;
         private readonly int _roundPoint;
         private readonly int _useForTest;
+        private readonly double _preselectSize;
 
         private readonly DataModel[] _sourceData;
         private readonly int _testSize;
@@ -65,7 +67,7 @@ namespace simple_rsi_trader.Classes
         private Dictionary<int, SequenceClass[]> ValidationSet { get; set; } = new();
         private Dictionary<int, SequenceClass> LastPrice { get; set; } = new();
 
-        public OptimizerInitClass(int testSize, int validationSize, int useForTest, IntRangeStruct rsiRange, DoubleRangeStruct rsiBuyLimits, DoubleRangeStruct rsiSellLimits, DoubleRangeStruct stopLossRange, DoubleRangeStruct takeProfitRange, DataModel[] data, IntRangeStruct lastRsiSequence, int horizon, DateTime restrictByDate, double commission, string instrument, int saveTop, int roundPoint) {
+        public OptimizerInitClass(int testSize, int validationSize, int useForTest, IntRangeStruct rsiRange, DoubleRangeStruct rsiBuyLimits, DoubleRangeStruct rsiSellLimits, DoubleRangeStruct stopLossRange, DoubleRangeStruct takeProfitRange, DataModel[] data, IntRangeStruct lastRsiSequence, int horizon, DateTime restrictByDate, double commission, string instrument, int saveTop, int roundPoint, double preselectSize) {
             _rsiBuyLimits = rsiBuyLimits;
             _rsiSellLimits = rsiSellLimits;
             _saveTop = saveTop;
@@ -81,6 +83,7 @@ namespace simple_rsi_trader.Classes
             _stopLossRange = new(min: stopLossRange.Min * _commission, max: stopLossRange.Max * _commission);
             _takeProfitRange = new(min: takeProfitRange.Min * _commission, max: takeProfitRange.Max * _commission);
             _sourceData = data;
+            _preselectSize = preselectSize;
 
             InitializeRsi(restrictByDate);
             CreateSequences();
@@ -123,8 +126,10 @@ namespace simple_rsi_trader.Classes
             _parametersSaved.GroupBy(m => m.Parameters.Operation).ToList().ForEach(operation => {
                 Console.WriteLine(operation.Key);
 
-                
-                IEnumerable<SavedModel> top = operation.ToList().OrderByDescending(m => Math.Abs(m.TrainedPerformance.Profit / (m.TrainedPerformance.Profit - m.TestedPerformance.Profit))).Take(_useForTest);
+
+                //IEnumerable<SavedModel> top = operation.ToList().OrderByDescending(m => Math.Abs(m.TrainedPerformance.Profit / (m.TrainedPerformance.Profit - m.TestedPerformance.Profit))).Take(_useForTest);
+                IEnumerable<SavedModel> top = operation.Where(m => m.TestedPerformance.Score > 0);//ToList().OrderByDescending(m => m.TestedPerformance.Score).Take(_useForTest);
+                //IEnumerable<SavedModel> top = operation.OrderByDescending(m => m.TestedPerformance.Score).Take(_useForTest);
 
                 StrategyClass strategy = new(models: top, operation: operation.Key, roundPoint: _roundPoint, commission: _commission);
                 strategy.LoadSequences(TestSet);
@@ -132,7 +137,7 @@ namespace simple_rsi_trader.Classes
 
                 Console.WriteLine($"Total profit: {(strategy.Profit / _commission):N3}");
 
-                foreach (SavedModel topModel in top) {
+                /*foreach (SavedModel topModel in top) {
                     Console.WriteLine($"Operation\t{topModel.Parameters.Operation}");
                     Console.WriteLine($"Profit: {topModel.TrainedPerformance.Profit:N3}\tActions: {topModel.TrainedPerformance.ActionCount}\tWR: {topModel.TrainedPerformance.WinRate}\tLR: {topModel.TrainedPerformance.LossRate}");
                     Console.WriteLine($"Profit: {topModel.TestedPerformance.Profit:N3}\tActions: {topModel.TestedPerformance.ActionCount}\tWR: {topModel.TestedPerformance.WinRate}\tLR: {topModel.TestedPerformance.LossRate}");
@@ -143,7 +148,7 @@ namespace simple_rsi_trader.Classes
                     Console.WriteLine($"Stop loss: {topModel.Parameters.StopLoss.Value}");
                     Console.WriteLine($"Take profit: {topModel.Parameters.TakeProfit.Value}");
                     Console.WriteLine();
-                }
+                }*/
             });
         }
 
@@ -223,7 +228,7 @@ namespace simple_rsi_trader.Classes
 
         private void OptimizationRunner(List<ParametersModel> parameters, int degOfParal) => parameters.AsParallel().WithDegreeOfParallelism(degOfParal).ForAll(parameter => {
             OptimizerClass optimizer = new(sequences: TrainSet[parameter.RsiPeriod], parameter: parameter, commission: _commission, roundPoint: _roundPoint);
-            optimizer.Optimize(_minTrainingProfitRequired[parameter.Operation]);
+            optimizer.Optimize(_minTrainingProfitRequired[parameter.Operation], _preselectSize);
 
             if (optimizer.IsSuccess) {
                 optimizer.LoadSequence(ValidationSet[parameter.RsiPeriod]);
@@ -244,7 +249,7 @@ namespace simple_rsi_trader.Classes
 
             savedModels.GroupBy(m => m.Parameters.Operation).ToList().ForEach(opGrouped => {
                 Console.WriteLine($"Operation:\t{opGrouped.Key}");
-                IEnumerable<SavedModel> models = opGrouped.OrderByDescending(m => m.TestedPerformance.Score).Take(_useForTest);
+                IEnumerable<SavedModel> models = opGrouped.Where(m => m.TestedPerformance.Score > 0);
                 StrategyClass strategy = new(models: models, operation: opGrouped.Key, roundPoint: _roundPoint, commission: _commission);
                 strategy.LoadSequence(LastPrice);
                 strategy.PredictLast();
@@ -252,7 +257,7 @@ namespace simple_rsi_trader.Classes
         }
 
         private void SaveThread() {
-            while (!_completionToken) {
+            while (!_completionToken || _parametersQueue.Count != 0) {
                 while (_parametersQueue.TryDequeue(out SavedModel newModel))
                     _parametersSaved.Add(newModel);
 
@@ -262,14 +267,33 @@ namespace simple_rsi_trader.Classes
                     .ToList().ForEach(operationGroup => {
                         List<SavedModel> operationGroupList = operationGroup.ToList();
 
-                        operationGroupList.ForEach(m => m.TestedPerformance.Score = Math.Abs(m.TrainedPerformance.Profit - m.TestedPerformance.Profit));
+                        IEnumerable<double[]> selectedData = operationGroupList.Select(m => new double[] { m.TrainedPerformance.Profit, m.TrainedPerformance.LossRate, m.TestedPerformance.LossRate, m.TestedPerformance.Profit });
+
+                        OrdinaryLeastSquares ols = new OrdinaryLeastSquares() { UseIntercept = false };
+                        SimpleLinearRegression reg1 = ols.Learn(selectedData.Select(m => m[0]).ToArray(), selectedData.Select(m => m[1]).ToArray());
+                        SimpleLinearRegression reg2 = ols.Learn(selectedData.Select(m => m[0]).ToArray(), selectedData.Select(m => m[2]).ToArray());
+                        SimpleLinearRegression reg3 = ols.Learn(selectedData.Select(m => m[3]).ToArray(), selectedData.Select(m => m[2]).ToArray());
+
+                        operationGroupList.ForEach(row => {
+                            double regL1 = reg1.Transform(row.TrainedPerformance.Profit) - row.TrainedPerformance.LossRate;
+                            double regL2 = reg1.Transform(row.TrainedPerformance.Profit) - row.TestedPerformance.LossRate;
+                            double regL3 = reg1.Transform(row.TestedPerformance.Profit) - row.TestedPerformance.LossRate;
+
+                            if (regL1 > 0 && regL2 > 0 && regL3 > 0)
+                                row.TestedPerformance.Score = regL1 + regL2 + regL3;
+                            else
+                                row.TestedPerformance.Score = 0;
+
+                        });
+
+                        /*operationGroupList.ForEach(m => m.TestedPerformance.Score = Math.Abs(m.TrainedPerformance.Profit - m.TestedPerformance.Profit));
 
                         DoubleRangeStruct scoreScaleFrom = new(min: operationGroupList.Min(m => m.TestedPerformance.Score), max: operationGroupList.Max(m => m.TestedPerformance.Score));
-                        operationGroupList.ForEach(m => m.TestedPerformance.Score = (0.4 * m.TestedPerformance.Profit + 0.6 * m.TrainedPerformance.Profit) / m.TestedPerformance.Score.ScaleMinMax(observedRange: scoreScaleFrom, scale: _scoreScalingTo));
+                        operationGroupList.ForEach(m => m.TestedPerformance.Score = (0.4 * m.TestedPerformance.Profit + 0.6 * m.TrainedPerformance.Profit) / m.TestedPerformance.Score.ScaleMinMax(observedRange: scoreScaleFrom, scale: _scoreScalingTo));*/
 
                         savedFiltered.AddRange(operationGroupList.OrderByDescending(m => m.TestedPerformance.Score).Take(_saveTop));
 
-                        _minTrainingProfitRequired[operationGroup.Key] = savedFiltered.Min(m => (m.TrainedPerformance.Profit + m.TestedPerformance.Profit) / 2) * _profitReducer;
+                        _minTrainingProfitRequired[operationGroup.Key] = savedFiltered.Min(m => m.TrainedPerformance.Profit) * _profitReducer;
                     });
 
                 if (savedFiltered.Count != 0) {
@@ -277,7 +301,10 @@ namespace simple_rsi_trader.Classes
                     SaveModels(_parametersSaved);
                 }
 
-                Thread.Sleep(10000);
+                if (!_completionToken)
+                    Thread.Sleep(10000);
+                else
+                    break;
             }
         }
 

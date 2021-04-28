@@ -108,6 +108,8 @@ namespace CommonLib
             }
 
             Data = Translate(dataArraySize);
+
+            DataSize = Data.Length;
         }
 
         private DataModel[] Translate(int dataArraySize)
@@ -135,6 +137,7 @@ namespace CommonLib
 
         public DataModel[] Data { get; private set; }
 
+        public int DataSize { get; private set; }
         public List<OhlcModel> Ohlc { get; private set; } = new List<OhlcModel>();
 
         public int RoundPoint { get; private set; }

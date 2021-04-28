@@ -10,43 +10,44 @@ namespace simple_rsi_trader.Classes
         public enum ActionOutcome : short { Success = 1, Failed = 0, NoAction = -1 };
 
         public static (double profit, ActionOutcome outcome) AssessProfitFromOrder(this OrderModel prediction, OperationType operation, double stopLoss, double takeProfit, double commission) {
+            double halfOfCommission = commission / 2d;
 
             if (operation == OperationType.Buy) {
-                if (prediction.Order > prediction.Low + commission / 2d && prediction.Order < prediction.LowestPrice - commission / 2d + stopLoss) {
+                if (prediction.Order > prediction.FirstLow + halfOfCommission && prediction.Order - stopLoss < prediction.LowestPrice - halfOfCommission) {
 
-                    double distance = prediction.Close - prediction.Order;
+                    double knownDistance = prediction.EndPeriodClosePrice - prediction.Order - halfOfCommission;
+                    double maxDistance = knownDistance;
 
-                    if (prediction.HighestPrice > prediction.High)
-                        distance = prediction.HighestPrice - prediction.Order - commission / 2d;
+                    if (prediction.NonFirstHighestPrice > 0)
+                        maxDistance = prediction.HighestPrice - prediction.Order - halfOfCommission;
 
-
-                    //double profit = distance < takeProfit ? distance - commission / 2d : takeProfit - commission / 2d;
-                    double profit = distance < takeProfit ? distance - commission / 2d : takeProfit - commission / 2d;
+                    double profit = maxDistance < takeProfit ? knownDistance : takeProfit - halfOfCommission;
 
                     if (profit > 0)
                         return (profit, ActionOutcome.Success);
                     else
                         return (profit, ActionOutcome.Failed);
                 }
-                else if (prediction.Order >= prediction.Low + commission / 2d + stopLoss)
-                    return ((-1) * (stopLoss + commission / 2d), ActionOutcome.Failed);
+                else if (prediction.Order - stopLoss >= prediction.FirstLow + halfOfCommission)
+                    return ((-1) * (stopLoss + halfOfCommission), ActionOutcome.Failed);
             }
-            else {
-                if (prediction.Order < prediction.High - commission / 2d && prediction.Order > prediction.HighestPrice + commission / 2d - stopLoss) {
+            else if (operation == OperationType.Sell) {
+                if (prediction.Order < prediction.FirstHigh - halfOfCommission  && prediction.Order + stopLoss > prediction.HighestPrice + halfOfCommission) {
 
-                    double distance = prediction.Order - prediction.Close;
+                    double knownDistance = prediction.Order - prediction.EndPeriodClosePrice - halfOfCommission;
+                    double maxDistance = knownDistance;
 
-                    if (prediction.LowestPrice < prediction.Low)
-                        distance = prediction.Order - prediction.LowestPrice - commission / 2d;
+                    if (prediction.NonFirstLowestPrice > 0)
+                        maxDistance = prediction.Order - prediction.NonFirstLowestPrice - halfOfCommission;
 
-                    double profit = distance < takeProfit ? distance - commission / 2d : takeProfit - commission / 2d;
+                    double profit = maxDistance < takeProfit ? knownDistance : takeProfit - halfOfCommission;
 
                     if (profit > 0)
                         return (profit, ActionOutcome.Success);
                     else
                         return (profit, ActionOutcome.Failed);
                 }
-                else if (prediction.Order <= prediction.High + commission / 2d - stopLoss)
+                else if (prediction.Order + stopLoss <= prediction.FirstHigh + halfOfCommission)
                     return ((-1) * (stopLoss + commission / 2d), ActionOutcome.Failed);
             }
             return (0, ActionOutcome.NoAction);
@@ -102,12 +103,16 @@ namespace simple_rsi_trader.Classes
                 return new PredictionStruct(
                     limitOrder: limitOrder,
                     stopLoss: Math.Round(limitOrder + weights[(int)OptimizingParameters.StopLoss], roundPoint),
-                    takeProfit: Math.Round(limitOrder - weights[(int)OptimizingParameters.TakeProfit], roundPoint));
+                    takeProfit: Math.Round(limitOrder - weights[(int)OptimizingParameters.TakeProfit], roundPoint),
+                    takeProfitDistance: Math.Round(weights[(int)OptimizingParameters.TakeProfit], roundPoint),
+                    stopLossDistance: Math.Round(weights[(int)OptimizingParameters.StopLoss], roundPoint));
             else
                 return new PredictionStruct(
                     limitOrder: limitOrder,
                     stopLoss: Math.Round(limitOrder - weights[(int)OptimizingParameters.StopLoss], roundPoint),
-                    takeProfit: Math.Round(limitOrder + weights[(int)OptimizingParameters.TakeProfit], roundPoint));
+                    takeProfit: Math.Round(limitOrder + weights[(int)OptimizingParameters.TakeProfit], roundPoint),
+                    stopLossDistance: Math.Round(weights[(int)OptimizingParameters.StopLoss], roundPoint),
+                    takeProfitDistance: Math.Round(weights[(int)OptimizingParameters.TakeProfit], roundPoint));
         }
     }
 }

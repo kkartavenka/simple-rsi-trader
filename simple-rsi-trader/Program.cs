@@ -1,4 +1,5 @@
 ﻿using CommonLib;
+using CommonLib.Models;
 using CommonLib.Models.Range;
 using simple_rsi_trader.Classes;
 using simple_rsi_trader.Models;
@@ -18,8 +19,7 @@ namespace simple_rsi_trader
 
         static int _horizon = 1;
         static readonly int _testSize = 50;
-        static readonly int _validationSize = 100;
-        static readonly int _randomInitCount = 3000000;
+        static readonly int _randomInitCount = 50000;
         static readonly int _useForTest = 5;
 
         #endregion
@@ -27,10 +27,10 @@ namespace simple_rsi_trader
         #region Parameters range setup
 
         static readonly IntRangeStruct _lastRsiSequence = new(1, 5);
-        static readonly IntRangeStruct _rsiRange = new(7, 40);
+        static readonly IntRangeStruct _rsiRange = new(5, 50);
 
-        static readonly DoubleRangeStruct _rsiBuyLimits = new(10, 60);
-        static readonly DoubleRangeStruct _rsiSellLimits = new(40, 90);
+        static readonly DoubleRangeStruct _rsiBuyLimits = new(10, 70);
+        static readonly DoubleRangeStruct _rsiSellLimits = new(30, 90);
 
         #endregion
 
@@ -40,11 +40,11 @@ namespace simple_rsi_trader
         static readonly DateTime _restrictByDate = new(2000, 01, 01);
         static readonly List<SignalModel> _dailyCharts = new()
         {
-            new SignalModel(name: "USDJPY1440.csv", commission: 0.007, stopLossRange: new(10, 40), takeProfitRange: new(40, 400)),
-            new SignalModel(name: "EURUSD1440.csv", commission: 0.00007, stopLossRange: new(10, 60), takeProfitRange: new(60, 500)),
-            new SignalModel(name: "NATGAS1440.csv", commission: 0.003, stopLossRange: new(10, 30), takeProfitRange: new(30, 500)),
-            new SignalModel(name: "XPDUSD1440.csv", commission: 4.31, stopLossRange: new(3, 10), takeProfitRange: new(10, 200)),
-            new SignalModel(name: "XAUUSD1440.csv", commission: 0.3, stopLossRange: new(10, 40), takeProfitRange: new(50, 400)),
+            new(name: "USDJPY1440.csv", commission: 0.007, stopLossRange: new(10, 40), takeProfitRange: new(80, 300), randomInitPoint: 100000, datasetInfo: new(validationSize: 0.1, preselectSize: 0.5, testSize: _testSize)),
+            new(name: "EURUSD1440.csv", commission: 0.00007, stopLossRange: new(10, 80), takeProfitRange: new(80, 500), randomInitPoint: 10000000, datasetInfo: new(validationSize: 0.1, preselectSize: 0.5, testSize: _testSize)),
+            new(name: "NATGAS1440.csv", commission: 0.003, stopLossRange: new(10, 30), takeProfitRange: new(30, 500), randomInitPoint: 5000000, datasetInfo: new(validationSize: 0.1, preselectSize: 0.5, testSize: _testSize)),
+            new(name: "XPDUSD1440.csv", commission: 4.31, stopLossRange: new(3, 10), takeProfitRange: new(30, 80), randomInitPoint: 10000000, datasetInfo: new(validationSize: 0.1, preselectSize: 0.5, testSize: _testSize)),
+            new(name: "XAUUSD1440.csv", commission: 0.3, stopLossRange: new(10, 40), takeProfitRange: new(50, 400), randomInitPoint: 100000, datasetInfo: new(validationSize: 0.1, preselectSize: 0.5, testSize: _testSize)),
         };
 
         #endregion
@@ -72,8 +72,8 @@ namespace simple_rsi_trader
                     cleanUp: true);
 
                 OptimizerInitClass optimizer = new(
-                    testSize: _testSize,
-                    validationSize: _validationSize,
+                    testSize: instrument.DatasetInfo.TestSize,
+                    validationSize: (int)(instrument.DatasetInfo.ValidationSize * (csvReader.DataSize - instrument.DatasetInfo.TestSize)),
                     useForTest: _useForTest,
                     rsiRange: _rsiRange,
                     rsiBuyLimits: _rsiBuyLimits,
@@ -87,7 +87,8 @@ namespace simple_rsi_trader
                     commission: instrument.Commission,
                     instrument: instrument.Name,
                     saveTop: _saveTopModelCount,
-                    roundPoint: csvReader.RoundPoint);
+                    roundPoint: csvReader.RoundPoint,
+                    preselectSize: instrument.DatasetInfo.PreselectSize);
 
                 if (!useModel)
                     optimizer.StartOptimization(randomInitCount: _randomInitCount, degreeOfParallelism: _degreeOfParallelism);

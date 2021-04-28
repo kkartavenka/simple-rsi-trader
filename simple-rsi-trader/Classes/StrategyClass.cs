@@ -1,4 +1,5 @@
-﻿using CommonLib.Models;
+﻿using Accord.Statistics;
+using CommonLib.Models;
 using simple_rsi_trader.Models;
 using System;
 using System.Collections.Generic;
@@ -10,7 +11,7 @@ namespace simple_rsi_trader.Classes
 {
     public class StrategyClass
     {
-        private const double _orderDistance = 10;
+        private readonly double _orderDistance = 10;
         private readonly double _commission;
         private readonly List<SavedModel> _models;
         private readonly int _roundPoint;
@@ -24,6 +25,8 @@ namespace simple_rsi_trader.Classes
             _operation = operation;
             _models = models.ToList();
             _models.ForEach(m => m.Parameters.ToOptimizableArray());
+
+            _orderDistance = models.Select(m => m.Parameters.StopLoss.Value).ToArray().Mean() * 0.66;
         }
 
         private List<PredictionStruct> GetPredictions(Dictionary<int, SequenceClass> sequence) {
@@ -31,9 +34,8 @@ namespace simple_rsi_trader.Classes
             List<PredictionStruct> returnVar = new();
 
             _models.ForEach(m => {
-                if (sequence[m.Parameters.RsiPeriod].CheckActivation(m.Parameters.OptimizableArray, m.Parameters)) {
+                if (sequence[m.Parameters.RsiPeriod].CheckActivation(m.Parameters.OptimizableArray, m.Parameters))
                     preparedOrders.Add(sequence[m.Parameters.RsiPeriod].GetOrder(m.Parameters.OptimizableArray, m.Parameters, _roundPoint));
-                }
             });
 
             if (_operation == OperationType.Sell) {
@@ -42,7 +44,7 @@ namespace simple_rsi_trader.Classes
                     if (i + 1 >= preparedOrders.Count)
                         returnVar.Add(preparedOrders[i]);
                     else {
-                        if (preparedOrders[i + 1].LimitOrder - preparedOrders[i].LimitOrder > _commission * _orderDistance)
+                        if (preparedOrders[i + 1].LimitOrder - preparedOrders[i].LimitOrder > _orderDistance)
                             returnVar.Add(preparedOrders[i]);
                         else {
                             if (preparedOrders[i + 1].StopLoss < preparedOrders[i].StopLoss)
@@ -55,13 +57,13 @@ namespace simple_rsi_trader.Classes
                 }
                 returnVar = returnVar.OrderBy(m => m.LimitOrder).ToList();
             }
-            else {
+            else if (_operation == OperationType.Buy) {
                 preparedOrders = preparedOrders.OrderByDescending(m => m.LimitOrder).ThenByDescending(m => m.StopLoss).ToList();
                 for (int i = 0; i < preparedOrders.Count; i++) {
                     if (i + 1 >= preparedOrders.Count)
                         returnVar.Add(preparedOrders[i]);
                     else {
-                        if (preparedOrders[i].LimitOrder - preparedOrders[i + 1].LimitOrder > _commission * _orderDistance) {
+                        if (preparedOrders[i].LimitOrder - preparedOrders[i + 1].LimitOrder > _orderDistance) {
                             returnVar.Add(preparedOrders[i]);
                         }
                         else {
@@ -91,6 +93,7 @@ namespace simple_rsi_trader.Classes
         public void Test() {
             double profit = 0;
             int itemCount = _testSet.First().Value.Length;
+            int actionCount = 0;
             List<int> rsiPeriod = _testSet.Keys.ToList();
 
             for (int i = 0; i < itemCount; i++) {
@@ -101,23 +104,27 @@ namespace simple_rsi_trader.Classes
 
                 SequenceClass sequence = preparedSequence.FirstOrDefault().Value;
 
+                actionCount += predictions.Count;
+
                 predictions.ForEach(prediction => {
                     OrderModel order = new(
-                        close: sequence.LatestClosePrice,
+                        endPeriodClosePrice: sequence.EndPeriodClosePrice,
                         order: prediction.LimitOrder,
-                        low: sequence.LowestPrice,
-                        high: sequence.HighestPrice,
+                        firstLow: sequence.FirstPeriodLowPrice,
+                        firstHigh: sequence.FirstPeriodHighPrice,
                         lowestPrice: sequence.LowestPrice,
-                        highestPrice: sequence.HighestPrice);
+                        highestPrice: sequence.HighestPrice,
+                        nonFirstHighestPrice: sequence.NonFirstHighestPrice,
+                        nonFirstLowestPrice: sequence.NonFirstLowestPrice);
 
-                    var result = order.AssessProfitFromOrder(operation: _operation, stopLoss: prediction.StopLoss, takeProfit: prediction.TakeProfit, commission: _commission);
+                    var result = order.AssessProfitFromOrder(operation: _operation, stopLoss: prediction.StopLossDistance, takeProfit: prediction.TakeProfitDistance, commission: _commission);
                     if (result.outcome != ActionOutcome.NoAction)
                         profit += result.profit;
                 });
             }
 
             IsSuccess = profit > 0;
-            Profit = profit;
+            Profit = profit / actionCount;
         }
 
         public bool IsSuccess { get; private set; }
