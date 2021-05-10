@@ -3,6 +3,8 @@ using CommonLib.Models;
 using simple_rsi_trader.Models;
 using System;
 using System.Collections.Generic;
+using System.IO;
+using static CommonLib.Enums.Enums;
 using static simple_rsi_trader.Classes.OperationClass;
 using static simple_rsi_trader.Models.ParametersModel;
 
@@ -12,17 +14,19 @@ namespace simple_rsi_trader.Classes
     {
         public enum ExecutionType : short { Train = 0, Test = 1 };
 
+        private const double _minWinRate = 0.01;
         private readonly ParametersModel _parameter;
         private SequenceClass[] _sequences;
-        private int _size;
         private readonly double _commission;
         private readonly int _roundPoint;
         private bool _roundOrder = false;
         private int _iteration = -1;
         private ExecutionType _executionType;
-        public OptimizerClass(SequenceClass[] sequences, ParametersModel parameter, double commission, int roundPoint)
-        {
+        private bool _isTraining;
+
+        public OptimizerClass(SequenceClass[] sequences, ParametersModel parameter, double commission, int roundPoint) {
             _parameter = parameter;
+            _isTraining = true;
             _roundPoint = roundPoint;
             _commission = commission;
             _sequences = sequences;
@@ -44,7 +48,7 @@ namespace simple_rsi_trader.Classes
             else if (returnVar[(int)OptimizingParameters.TakeProfit] > _parameter.TakeProfit.Range.Max)
                 returnVar[(int)OptimizingParameters.TakeProfit] = _parameter.TakeProfit.Range.Max;
 
-            if(_parameter.Operation == OperationType.Buy) {
+            if (_parameter.Operation == OperationType.Buy) {
                 if (returnVar[(int)OptimizingParameters.Weight0] > _parameter.RsiLimits.Range.Max)
                     returnVar[(int)OptimizingParameters.Weight0] = _parameter.RsiLimits.Range.Max;
 
@@ -78,10 +82,10 @@ namespace simple_rsi_trader.Classes
                 weights[(int)OptimizingParameters.TakeProfit] = Math.Round(weights[(int)OptimizingParameters.TakeProfit], _roundPoint);
             }
 
-            for (int i = 0; i < _size; i++) {
+            for (int i = 0; i < _sequences.Length; i++) {
                 if (_sequences[i].CheckActivation(weights, _parameter)) {
-                    double limitOrder = _sequences[i].GetLimitOrder(weights, _parameter, _roundOrder, _roundPoint);
-                    
+                    double limitOrder = _sequences[i].GetLimitOrder(weights, _parameter, _roundOrder, _roundPoint, _isTraining);
+
                     OrderModel order = new(
                         endPeriodClosePrice: _sequences[i].EndPeriodClosePrice,
                         order: limitOrder,
@@ -96,7 +100,7 @@ namespace simple_rsi_trader.Classes
                         operation: _parameter.Operation,
                         stopLoss: weights[(int)OptimizingParameters.StopLoss],
                         takeProfit: weights[(int)OptimizingParameters.TakeProfit],
-                        commission: _commission); // GetProfitFromOrder(order, weights[(int)OptimizingParameters.StopLoss], weights[(int)OptimizingParameters.TakeProfit]);
+                        commission: _commission);
 
                     switch (outcome) {
                         case ActionOutcome.Failed:
@@ -116,39 +120,45 @@ namespace simple_rsi_trader.Classes
                 }
             }
 
-            Performance[_executionType].CalculateMetrics(_commission, _size);
+            Performance[_executionType].CalculateMetrics(_commission, _sequences.Length);
             return Performance[_executionType].Score;
         }
 
-        public void LoadSequence(SequenceClass[] sequences) => _sequences = sequences;
+        public void LoadSequence(SequenceClass[] sequences, bool isTraining) {
+            _sequences = sequences;
+            _isTraining = isTraining;
+        }
 
-        public void Optimize(double minTrainingScore, double preselectSize) {
+        public (double preTrainScore, double postTrainScore) Optimize(double minTrainingScore) {
             IsSuccess = false;
             Performance.Add(_executionType, new());
 
-            _size = (int)(_sequences.Length * preselectSize);
             _executionType = ExecutionType.Train;
             _parameter.ToOptimizableArray();
 
             double preTrainScore = Evaluate(_parameter.OptimizableArray);
+            double postTrainScore = 0;
             if (preTrainScore > minTrainingScore) {
-                _size = _sequences.Length;
                 function = Evaluate;
 
                 var solver = new NelderMead(numberOfVariables: _parameter.ParametersCount) {
                     Function = function,
                 };
-                solver.Maximize(_parameter.OptimizableArray);
+                bool converged = solver.Maximize(_parameter.OptimizableArray);
+
+                if (!converged)
+                    return (0, 0);
 
                 _roundOrder = true;
-                Evaluate(solver.Solution);
+                postTrainScore = Evaluate(solver.Solution);
 
-                if (Performance[_executionType].Profit > minTrainingScore && double.IsFinite(Performance[_executionType].WinRate) && Performance[ExecutionType.Train].Profit < 1000) {
+                if (Performance[_executionType].Profit > minTrainingScore && double.IsFinite(Performance[_executionType].WinRate) && Performance[ExecutionType.Train].Profit < 1000 && (double)Performance[_executionType].WinCount / _sequences.Length > _minWinRate) {
                     IsSuccess = true;
                     _parameter.ToModel(solver.Solution);
                 }
             }
 
+            return (preTrainScore, postTrainScore);
         }
 
         public void Validate() {
@@ -157,15 +167,13 @@ namespace simple_rsi_trader.Classes
             _executionType = ExecutionType.Test;
             Performance.Add(_executionType, new());
 
-            _size = _sequences.Length;
-
             _parameter.ToOptimizableArray();
 
             Evaluate(_parameter.OptimizableArray);
 
             if (Performance[ExecutionType.Test].Profit > 0 && double.IsFinite(Performance[_executionType].WinRate) && Performance[ExecutionType.Test].Profit < 1000) {
                 IsSuccess = true;
-                Console.WriteLine($"{_parameter.Operation}\tTraining: {(Performance[ExecutionType.Train].Profit):N2}\tTesting: {(Performance[ExecutionType.Test].Profit):N2}\t SL: {_parameter.StopLoss.Value}\tTP: {_parameter.TakeProfit.Value}\tIterations: {_iteration}");
+                //Console.WriteLine($"{_parameter.Operation}\tTraining: {(Performance[ExecutionType.Train].Profit):N2}\tTesting: {(Performance[ExecutionType.Test].Profit):N2}\t SL: {_parameter.StopLoss.Value}\tTP: {_parameter.TakeProfit.Value}\tIterations: {_iteration}");
             }
         }
 

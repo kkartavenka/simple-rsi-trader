@@ -1,12 +1,11 @@
 ﻿using CommonLib.Models;
+using static CommonLib.Enums.Enums;
 
 namespace simple_rsi_trader.Models
 {
     public class ParametersModel
     {
         private const int _fixedOffset = 2;
-        public enum OptimizingParameters : int  {StopLoss = 0, TakeProfit = 1, Weight0 = 2, Weight1 = 3, Offset0 = 4, Offset1 = 5 };
-        public enum OperationType : int { Buy = 0, Sell = 1 };
 
         public ParametersModel(
             int rsiPeriod,
@@ -54,6 +53,7 @@ namespace simple_rsi_trader.Models
 
             OptimizableArray[(int)OptimizingParameters.Offset0] = Offset[0];
             OptimizableArray[(int)OptimizingParameters.Offset1] = Offset[1];
+            OptimizableArray[(int)OptimizingParameters.Offset2] = Offset[2];
         }
 
         public void ToModel(double[] values)
@@ -66,6 +66,7 @@ namespace simple_rsi_trader.Models
 
             Offset[0] = values[(int)OptimizingParameters.Offset0];
             Offset[1] = values[(int)OptimizingParameters.Offset1];
+            Offset[2] = values[(int)OptimizingParameters.Offset2];
         }
     }
 }

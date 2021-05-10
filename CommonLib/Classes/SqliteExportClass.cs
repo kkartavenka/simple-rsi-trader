@@ -26,7 +26,7 @@ namespace CommonLib.Classes
 
             string sqlQuery = 
                 $"CREATE TABLE {_instrumentDataTable} (id INTEGER PRIMARY KEY, date_time TEXT NOT NULL, open REAL NOT NULL, high REAL NOT NULL, low REAL NOT NULL, close REAL NOT NULL, typical_price REAL NOT NULL, volume REAL NOT NULL);" +
-                $"CREATE TABLE {_predictionTable} (id INTEGER PRIMARY KEY, instrument_data_id INTEGER NOT NULL, limit_order REAL NOT NULL, stop_loss REAL NOT NULL, take_profit REAL NOT NULL);";
+                $"CREATE TABLE {_predictionTable} (id INTEGER PRIMARY KEY, operation_type TEXT, instrument_data_id INTEGER NOT NULL, limit_order REAL NOT NULL, stop_loss REAL NOT NULL, take_profit REAL NOT NULL);";
 
             ExecuteNonQuery(sqlQuery);
         }
@@ -54,7 +54,7 @@ namespace CommonLib.Classes
 
         public void PushPredictions(List<PredictionModel> predictions) {
             string insertedValues = string.Join(',', predictions.Select(m => $"({m.ToSqliteRow()})"));
-            string sqlQuery = $"INSERT INTO {_predictionTable} (id, limit_order, stop_loss, take_profit) VALUES {insertedValues};";
+            string sqlQuery = $"INSERT INTO {_predictionTable} (operation_type, instrument_data_id, limit_order, stop_loss, take_profit) VALUES {insertedValues};";
 
             ExecuteNonQuery(sqlQuery);
         }

@@ -25,6 +25,6 @@ namespace CommonLib.Models
         public DateTime Date { get; private set; }
         public double[] Data { get; set; }
 
-        public string ToSqliteRow() => $"{Id},{Date:yyyy-MM-dd HH:mm:ss},{Data[(int)DataColumn.Open]},{Data[(int)DataColumn.High]},{Data[(int)DataColumn.Low]},{Data[(int)DataColumn.Close]},{Data[(int)DataColumn.TypicalPrice]},{Data[(int)DataColumn.Volume]}";
+        public string ToSqliteRow() => $"{Id},'{Date:yyyy-MM-dd HH:mm:ss}',{Data[(int)DataColumn.Open]},{Data[(int)DataColumn.High]},{Data[(int)DataColumn.Low]},{Data[(int)DataColumn.Close]},{Data[(int)DataColumn.TypicalPrice]},{Data[(int)DataColumn.Volume]}";
     }
 }

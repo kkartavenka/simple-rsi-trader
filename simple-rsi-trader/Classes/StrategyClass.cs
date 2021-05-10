@@ -1,11 +1,12 @@
 ﻿using Accord.Statistics;
 using CommonLib.Models;
+using CommonLib.Models.Export;
 using simple_rsi_trader.Models;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using static CommonLib.Enums.Enums;
 using static simple_rsi_trader.Classes.OperationClass;
-using static simple_rsi_trader.Models.ParametersModel;
 
 namespace simple_rsi_trader.Classes
 {
@@ -35,47 +36,35 @@ namespace simple_rsi_trader.Classes
 
             _models.ForEach(m => {
                 if (sequence[m.Parameters.RsiPeriod].CheckActivation(m.Parameters.OptimizableArray, m.Parameters))
-                    preparedOrders.Add(sequence[m.Parameters.RsiPeriod].GetOrder(m.Parameters.OptimizableArray, m.Parameters, _roundPoint));
+                    preparedOrders.Add(sequence[m.Parameters.RsiPeriod].GetOrder(m.Parameters.OptimizableArray, m.Parameters, _roundPoint, m.TestedPerformance.Score));
             });
+
+            if (preparedOrders.Count == 0)
+                return returnVar;
 
             if (_operation == OperationType.Sell) {
                 preparedOrders = preparedOrders.OrderBy(m => m.LimitOrder).ThenBy(m => m.StopLoss).ToList();
-                for (int i = 0; i < preparedOrders.Count; i++) {
-                    if (i + 1 >= preparedOrders.Count)
-                        returnVar.Add(preparedOrders[i]);
-                    else {
-                        if (preparedOrders[i + 1].LimitOrder - preparedOrders[i].LimitOrder > _orderDistance)
-                            returnVar.Add(preparedOrders[i]);
-                        else {
-                            if (preparedOrders[i + 1].StopLoss < preparedOrders[i].StopLoss)
-                                returnVar.Add(preparedOrders[i + 1]);
-                            else
-                                returnVar.Add(preparedOrders[i]);
-                            i++;
-                        }
-                    }
+                double minLimitOrder = preparedOrders.First().LimitOrder;
+
+                while (preparedOrders.Where(m => m.LimitOrder >= minLimitOrder).Count() > 0) {
+                    List<PredictionStruct> similarOrders = preparedOrders.Where(m => m.LimitOrder >= minLimitOrder && m.LimitOrder < minLimitOrder + _orderDistance).ToList();
+                    returnVar.Add(similarOrders.OrderByDescending(m => m.Score).First());
+
+                    List<PredictionStruct> nextPoints = preparedOrders.Where(m => m.LimitOrder > similarOrders.Max(m => m.LimitOrder)).ToList();
+                    minLimitOrder = nextPoints.Count != 0 ? nextPoints.First().LimitOrder : double.MaxValue;
                 }
-                returnVar = returnVar.OrderBy(m => m.LimitOrder).ToList();
             }
             else if (_operation == OperationType.Buy) {
                 preparedOrders = preparedOrders.OrderByDescending(m => m.LimitOrder).ThenByDescending(m => m.StopLoss).ToList();
-                for (int i = 0; i < preparedOrders.Count; i++) {
-                    if (i + 1 >= preparedOrders.Count)
-                        returnVar.Add(preparedOrders[i]);
-                    else {
-                        if (preparedOrders[i].LimitOrder - preparedOrders[i + 1].LimitOrder > _orderDistance) {
-                            returnVar.Add(preparedOrders[i]);
-                        }
-                        else {
-                            if (preparedOrders[i + 1].StopLoss > preparedOrders[i].StopLoss)
-                                returnVar.Add(preparedOrders[i + 1]);
-                            else
-                                returnVar.Add(preparedOrders[i]);
-                            i++;
-                        }
-                    }
+
+                double maxLimitOrder = preparedOrders.First().LimitOrder;
+                while (preparedOrders.Where(m=>m.LimitOrder <= maxLimitOrder).Count() > 0) {
+                    List<PredictionStruct> similarOrders = preparedOrders.Where(m => m.LimitOrder <= maxLimitOrder && m.LimitOrder > maxLimitOrder - _orderDistance).ToList();
+                    returnVar.Add(similarOrders.OrderByDescending(m => m.Score).First());
+
+                    List<PredictionStruct> nextPoints = preparedOrders.Where(m => m.LimitOrder < similarOrders.Min(m => m.LimitOrder)).ToList();
+                    maxLimitOrder = nextPoints.Count != 0 ? nextPoints.First().LimitOrder : double.MinValue;
                 }
-                returnVar = returnVar.OrderByDescending(m => m.LimitOrder).ToList();
             }
 
             return returnVar;
@@ -90,11 +79,13 @@ namespace simple_rsi_trader.Classes
             predictions.ForEach(row => Console.WriteLine($"Limit order: {row.LimitOrder}\tStop loss: {row.StopLoss}\tTakeProfit: {row.TakeProfit}"));
         }
 
-        public void Test() {
+        public List<PredictionModel> Test() {
             double profit = 0;
             int itemCount = _testSet.First().Value.Length;
             int actionCount = 0;
             List<int> rsiPeriod = _testSet.Keys.ToList();
+
+            List<PredictionModel> export = new();
 
             for (int i = 0; i < itemCount; i++) {
                 Dictionary<int, SequenceClass> preparedSequence = new();
@@ -117,14 +108,20 @@ namespace simple_rsi_trader.Classes
                         nonFirstHighestPrice: sequence.NonFirstHighestPrice,
                         nonFirstLowestPrice: sequence.NonFirstLowestPrice);
 
+                    export.Add(new(id: _testSet[rsiPeriod[0]][i].Id, operation: _operation, prediction: prediction));
+
                     var result = order.AssessProfitFromOrder(operation: _operation, stopLoss: prediction.StopLossDistance, takeProfit: prediction.TakeProfitDistance, commission: _commission);
-                    if (result.outcome != ActionOutcome.NoAction)
+                    if (result.outcome != ActionOutcome.NoAction) {
+
                         profit += result.profit;
+                    }
                 });
             }
 
             IsSuccess = profit > 0;
             Profit = profit / actionCount;
+
+            return export;
         }
 
         public bool IsSuccess { get; private set; }

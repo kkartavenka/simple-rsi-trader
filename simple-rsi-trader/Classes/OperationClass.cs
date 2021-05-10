@@ -1,7 +1,9 @@
-﻿using CommonLib.Models;
+﻿using Accord.Statistics;
+using Accord.Statistics.Models.Regression.Linear;
+using CommonLib.Models;
 using simple_rsi_trader.Models;
 using System;
-using static simple_rsi_trader.Models.ParametersModel;
+using static CommonLib.Enums.Enums;
 
 namespace simple_rsi_trader.Classes
 {
@@ -57,6 +59,10 @@ namespace simple_rsi_trader.Classes
         public static bool CheckActivation(this SequenceClass sequence, double[] weights, ParametersModel parameter) {
             bool returnVar = true;
             double[] rsiSequence = sequence.RsiSequence[^parameter.IndicatorLastPointSequence..];
+            double[] x = new double[rsiSequence.Length];
+            
+            for (int i = 0; i < x.Length; i++)
+                x[i] = i;
 
             for (int i = 0; i < rsiSequence.Length; i++) {
                 if (parameter.Operation == OperationType.Buy) {
@@ -73,21 +79,51 @@ namespace simple_rsi_trader.Classes
                 }
             }
 
+            if (returnVar) {
+                OrdinaryLeastSquares ols = new OrdinaryLeastSquares() { UseIntercept = true };
+                SimpleLinearRegression reg = ols.Learn(x, rsiSequence);
+
+                if (reg.Slope > 0 && parameter.Operation == OperationType.Sell) {
+                    double[] expectedRsi = reg.Transform(x);
+                    double r2 = expectedRsi.RSquared(rsiSequence);
+
+                    if (r2 < 0.25)
+                        returnVar = false;
+                }
+                else if (reg.Slope < 0 && parameter.Operation == OperationType.Buy) {
+                    double[] expectedRsi = reg.Transform(x);
+                    double r2 = expectedRsi.RSquared(rsiSequence);
+
+                    if (r2 < 0.25)
+                        returnVar = false;
+                }
+                else
+                    returnVar = false;
+            }
+
             return returnVar;
         }
 
-        public static double GetLimitOrder(this SequenceClass sequence, double[] weights, ParametersModel parameter, bool round, int roundPoint) {
+        public static double GetLimitOrder(this SequenceClass sequence, double[] weights, ParametersModel parameter, bool round, int roundPoint, bool isTraining) {
             double limitOrder;
 
             if (parameter.Operation == OperationType.Sell) {
                 limitOrder = sequence.CurrentClosePrice
-                    + weights[(int)OptimizingParameters.Offset0]
-                    - weights[(int)OptimizingParameters.Offset1] * sequence.RsiSequence[^1];
+                    + sequence.CurrentClosePrice * weights[(int)OptimizingParameters.Offset0]
+                    - weights[(int)OptimizingParameters.Offset1] * sequence.RsiSequence[^1]
+                    - weights[(int)OptimizingParameters.Offset2] * sequence.RsiSequence[^1] * sequence.RsiSequence[^1];
+
+                if (limitOrder < sequence.CurrentClosePrice && !isTraining)
+                    limitOrder = sequence.CurrentClosePrice;
             }
             else {
                 limitOrder = sequence.CurrentClosePrice
-                    - weights[(int)OptimizingParameters.Offset0]
-                    + weights[(int)OptimizingParameters.Offset1] * (100 - sequence.RsiSequence[^1]);
+                    - sequence.CurrentClosePrice * weights[(int)OptimizingParameters.Offset0]
+                    + weights[(int)OptimizingParameters.Offset1] * (100 - sequence.RsiSequence[^1])
+                    + +weights[(int)OptimizingParameters.Offset2] * (100 - sequence.RsiSequence[^1]) * (100 - sequence.RsiSequence[^1]);
+
+                if (limitOrder > sequence.CurrentClosePrice && !isTraining)
+                    limitOrder = sequence.CurrentClosePrice;
             }
 
             if (round)
@@ -96,8 +132,8 @@ namespace simple_rsi_trader.Classes
             return limitOrder;
         }
 
-        public static PredictionStruct GetOrder(this SequenceClass sequence, double[] weights, ParametersModel parameter, int roundPoint) {
-            double limitOrder = sequence.GetLimitOrder(weights, parameter, true, roundPoint);
+        public static PredictionStruct GetOrder(this SequenceClass sequence, double[] weights, ParametersModel parameter, int roundPoint, double score) {
+            double limitOrder = sequence.GetLimitOrder(weights, parameter, true, roundPoint, isTraining: false);
 
             if (parameter.Operation == OperationType.Sell)
                 return new PredictionStruct(
@@ -105,14 +141,29 @@ namespace simple_rsi_trader.Classes
                     stopLoss: Math.Round(limitOrder + weights[(int)OptimizingParameters.StopLoss], roundPoint),
                     takeProfit: Math.Round(limitOrder - weights[(int)OptimizingParameters.TakeProfit], roundPoint),
                     takeProfitDistance: Math.Round(weights[(int)OptimizingParameters.TakeProfit], roundPoint),
-                    stopLossDistance: Math.Round(weights[(int)OptimizingParameters.StopLoss], roundPoint));
+                    stopLossDistance: Math.Round(weights[(int)OptimizingParameters.StopLoss], roundPoint),
+                    score: score);
             else
                 return new PredictionStruct(
                     limitOrder: limitOrder,
                     stopLoss: Math.Round(limitOrder - weights[(int)OptimizingParameters.StopLoss], roundPoint),
                     takeProfit: Math.Round(limitOrder + weights[(int)OptimizingParameters.TakeProfit], roundPoint),
                     stopLossDistance: Math.Round(weights[(int)OptimizingParameters.StopLoss], roundPoint),
-                    takeProfitDistance: Math.Round(weights[(int)OptimizingParameters.TakeProfit], roundPoint));
+                    takeProfitDistance: Math.Round(weights[(int)OptimizingParameters.TakeProfit], roundPoint),
+                    score: score);
+        }
+
+        private static double RSquared(this double[] expected, double[] observed) {
+            double yMean = observed.Mean();
+            double ssTot = 0;
+            double ssRes = 0;
+
+            for (int i = 0; i < observed.Length; i++) {
+                ssTot += Math.Pow((observed[i] - yMean), 2);
+                ssRes += Math.Pow((observed[i] - expected[i]), 2);
+            }
+
+            return 1 - (ssRes / ssTot);
         }
     }
 }
