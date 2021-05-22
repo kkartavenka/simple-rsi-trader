@@ -65,6 +65,8 @@ namespace simple_rsi_trader.Classes
                     returnVar[(int)OptimizingParameters.Weight1] = (returnVar[(int)OptimizingParameters.Weight0] - _parameter.RsiLimits.Range.Min) / _parameter.IndicatorLastPointSequence;
             }
 
+            if (returnVar[(int)OptimizingParameters.RSquaredCutOff] < _parameter.RSquaredCutOff.Range.Min)
+                returnVar[(int)OptimizingParameters.RSquaredCutOff] = _parameter.RSquaredCutOff.Range.Min;
 
             return returnVar;
         }
@@ -83,7 +85,10 @@ namespace simple_rsi_trader.Classes
             }
 
             for (int i = 0; i < _sequences.Length; i++) {
-                if (_sequences[i].CheckActivation(weights, _parameter)) {
+                
+                bool condition = (_sequences[i].AllowBuy && _parameter.Operation == OperationType.Buy) || (_sequences[i].AllowSell && _parameter.Operation == OperationType.Sell);
+                
+                if (condition && _sequences[i].CheckActivation(weights, _parameter)) {
                     double limitOrder = _sequences[i].GetLimitOrder(weights, _parameter, _roundOrder, _roundPoint, _isTraining);
 
                     OrderModel order = new(
@@ -143,6 +148,7 @@ namespace simple_rsi_trader.Classes
 
                 var solver = new NelderMead(numberOfVariables: _parameter.ParametersCount) {
                     Function = function,
+                     
                 };
                 bool converged = solver.Maximize(_parameter.OptimizableArray);
 

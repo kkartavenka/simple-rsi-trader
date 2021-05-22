@@ -1,4 +1,5 @@
 ﻿using simple_rsi_trader.Models;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 
@@ -7,11 +8,10 @@ namespace simple_rsi_trader.Classes
     public class SavedModelComparerClass : IEqualityComparer<SavedModel>
     {
         public bool Equals(SavedModel x, SavedModel y) {
-            bool trainProfit = x.TrainedPerformance.Profit == y.TrainedPerformance.Profit;
-            bool testProfit = x.TestedPerformance.Profit == y.TestedPerformance.Profit;
+            bool trainProfit = Math.Max(x.TrainedPerformance.Profit, y.TrainedPerformance.Profit) / Math.Min(x.TrainedPerformance.Profit, y.TrainedPerformance.Profit) < 0.01;
+            bool testProfit = Math.Max(x.TestedPerformance.Profit, y.TestedPerformance.Profit) / Math.Min(x.TestedPerformance.Profit, y.TestedPerformance.Profit) < 0.01;
 
-            bool lastPoint = x.Parameters.IndicatorLastPointSequence == y.Parameters.IndicatorLastPointSequence;
-            bool operation = x.Parameters.Operation == y.Parameters.Operation;
+
 
             bool offset = true;
             for (int i = 0; i < x.Parameters.Offset.Length; i++)
@@ -21,7 +21,7 @@ namespace simple_rsi_trader.Classes
             for (int i = 0; i < x.Parameters.Weights.Length; i++)
                 weights &= x.Parameters.Weights[i] == y.Parameters.Weights[i];
 
-            return lastPoint && operation && weights && offset && testProfit && trainProfit;
+            return weights && offset && testProfit && trainProfit;
         }
 
         public int GetHashCode([DisallowNull] SavedModel obj) {

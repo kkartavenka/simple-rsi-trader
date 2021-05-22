@@ -1,4 +1,5 @@
-﻿using Accord.Statistics;
+﻿using Accord.Math.Optimization;
+using Accord.Statistics;
 using Accord.Statistics.Models.Regression.Linear;
 using CommonLib.Classes;
 using CommonLib.Classes.DeepCopy;
@@ -36,7 +37,7 @@ namespace simple_rsi_trader.Classes
         private readonly double _commission;
         private readonly int _roundPoint;
 
-        private const double _defaultInterceptOffset = 0.5;
+        //private const double _defaultInterceptOffset = 0.5;
 
         private readonly DataModel[] _sourceData;
         private readonly int _testSize;
@@ -144,9 +145,12 @@ namespace simple_rsi_trader.Classes
 
             });
 
-            SqliteExportClass exporter = new($"{_modelFileName}");
-            exporter.PushPredictions(predictions);
-            exporter.PushInstrumentData(_sourceData.Where(m => m.Id >= predictions.Min(m => m.Id)).ToArray());
+            try {
+                SqliteExportClass exporter = new($"{_modelFileName}");
+                exporter.PushPredictions(predictions);
+                exporter.PushInstrumentData(_sourceData.Where(m => m.Id >= predictions.Min(m => m.Id)).ToArray());
+            }
+            catch { }
         }
 
         private List<ParametersModel> GenerateInitPoints(int count) {
@@ -168,8 +172,9 @@ namespace simple_rsi_trader.Classes
                     takeProfit: new(_takeProfitRange, (_takeProfitRange.Max - _takeProfitRange.Min).GetRandomDouble() + _takeProfitRange.Min),
                     weights: new double[] { buyConstant.Value, buySlope },
                     indicatorLastPointSequence: lastPointSequence,
-                    offset: new double[] { 0.15d.GetRandomDouble(), 0.001d.GetRandomDouble(), 0.01d.GetRandomDouble() },
-                    operation: OperationType.Buy));
+                    offset: new double[] { 0.15d.GetRandomDouble(), 0.01d.GetRandomDouble() - 0.001, 0.01d.GetRandomDouble() },
+                    operation: OperationType.Buy,
+                    rsquaredCutOff: new PointStruct(range: new DoubleRangeStruct(min: 0.25, max: 0.95), 0.25 + 0.7d.GetRandomDouble())));
 
                 returnVar.Add(new(
                     rsiPeriod: (_rsiRange.Max - _rsiRange.Min).GetRandomInt() + _rsiRange.Min,
@@ -178,14 +183,48 @@ namespace simple_rsi_trader.Classes
                     takeProfit: new(_takeProfitRange, (_takeProfitRange.Max - _takeProfitRange.Min).GetRandomDouble() + _takeProfitRange.Min),
                     weights: new double[] { sellConstant.Value, sellSlope },
                     indicatorLastPointSequence: lastPointSequence,
-                    offset: new double[] { 0.15d.GetRandomDouble(), 0.001d.GetRandomDouble(), 0.01d.GetRandomDouble() },
-                    operation: OperationType.Sell));
+                    offset: new double[] { 0.15d.GetRandomDouble(), 0.01d.GetRandomDouble() - 0.001, 0.01d.GetRandomDouble() },
+                    operation: OperationType.Sell,
+                    rsquaredCutOff: new PointStruct(range: new DoubleRangeStruct(min: 0.25, max: 0.95), 0.25 + 0.7d.GetRandomDouble())));
             }
 
             _modelsLeft = returnVar.Count;
             Console.WriteLine($"Models created for evaluation: {_modelsLeft}");
 
             return returnVar;
+        }
+
+        private IEnumerable<SavedModel> GetVerifiedModels(List<SavedModel> groupedModels) {
+            double defaultInterceptOffset = Measures.Quantile(groupedModels.Select(m => m.TrainedPerformance.Profit).ToArray(), 0.75);
+
+            List<double[]> selectedData = groupedModels.Select(m => new double[] { m.TrainedPerformance.Profit, m.TrainedPerformance.LossRate + defaultInterceptOffset, m.TestedPerformance.LossRate + defaultInterceptOffset, m.TestedPerformance.Profit, m.TrainedPerformance.WinRate, m.TestedPerformance.WinRate }).ToList();
+
+            File.WriteAllLines($"{_modelFileName}.csv", selectedData.Select(row => string.Join(',', row)).ToArray());
+
+            OrdinaryLeastSquares ols = new OrdinaryLeastSquares() { UseIntercept = false };
+            PolynomialLeastSquares poly = new PolynomialLeastSquares() { Degree = 2 };
+
+
+            SimpleLinearRegression reg1 = ols.Learn(selectedData.Select(m => m[0]).ToArray(), selectedData.Select(m => m[1]).ToArray());
+            SimpleLinearRegression reg2 = ols.Learn(selectedData.Select(m => m[0]).ToArray(), selectedData.Select(m => m[2]).ToArray());
+            SimpleLinearRegression reg3 = ols.Learn(selectedData.Select(m => m[3]).ToArray(), selectedData.Select(m => m[2]).ToArray());
+            SimpleLinearRegression reg4 = ols.Learn(selectedData.Select(m => m[1]).ToArray(), selectedData.Select(m => m[2]).ToArray());
+
+            groupedModels.ForEach(row => {
+                double regL1 = reg1.Transform(row.TrainedPerformance.Profit) - row.TrainedPerformance.LossRate - defaultInterceptOffset;
+                double regL2 = reg2.Transform(row.TrainedPerformance.Profit) - row.TestedPerformance.LossRate - defaultInterceptOffset;
+                double regL3 = reg3.Transform(row.TestedPerformance.Profit) - row.TestedPerformance.LossRate - defaultInterceptOffset;
+                double regL4 = reg4.Transform(row.TrainedPerformance.LossRate) - row.TestedPerformance.LossRate;
+
+                if (regL1 > 0 && regL2 > 0 && regL3 > 0 && regL4 > 0)
+                    row.TestedPerformance.Score = regL1 + regL2 + regL3 + regL4;
+                else
+                    row.TestedPerformance.Score = 0;
+
+            });
+
+            IEnumerable<SavedModel> selected = groupedModels.OrderByDescending(m => m.TestedPerformance.Score).ThenByDescending(m => m.TrainedPerformance.Profit).Take(_saveTop * 2);
+            return selected;
         }
 
         private void InitializeRsi(DateTime restrictByDate) {
@@ -269,7 +308,7 @@ namespace simple_rsi_trader.Classes
                 List<SavedModel> savedFiltered = new();
                 List<SavedModel> intermediateFiltered = new();
 
-                while(_optimizationImprovementQueue.TryDequeue(out var optimization)) {
+                while (_optimizationImprovementQueue.TryDequeue(out var optimization)) {
                     if (_optimizationImprovement.ContainsKey(optimization.Item1))
                         _optimizationImprovement[optimization.Item1].Add(optimization.Item2);
                     else
@@ -281,40 +320,16 @@ namespace simple_rsi_trader.Classes
 
                         double minProfit = 0;
 
-                        List<SavedModel> operationGroupList = operationGroup.Distinct(new SavedModelComparerClass()).ToList();
-                        
+                        List<SavedModel> operationGroupList = operationGroup.SelectDistinct();//Distinct(new SavedModelComparerClass()).ToList();
 
                         if (operationGroupList.Count > _saveTop) {
 
-                            List<double[]> selectedData = operationGroupList.Select(m => new double[] { m.TrainedPerformance.Profit, m.TrainedPerformance.LossRate + _defaultInterceptOffset, m.TestedPerformance.LossRate + _defaultInterceptOffset, m.TestedPerformance.Profit, m.TrainedPerformance.WinRate, m.TestedPerformance.WinRate }).ToList();
+                            IEnumerable<SavedModel> verifiedModels = GetVerifiedModels(operationGroupList);
 
-                            List<string> outputLines = new List<string>();
-                            selectedData.ForEach(row => outputLines.Add(string.Join(',', row)));
+                            minProfit = verifiedModels.Min(m => m.TrainedPerformance.Profit);
 
-                            File.WriteAllLines($"{_modelFileName}.csv", outputLines);
-
-                            OrdinaryLeastSquares ols = new OrdinaryLeastSquares() { UseIntercept = false };
-                            SimpleLinearRegression reg1 = ols.Learn(selectedData.Select(m => m[0]).ToArray(), selectedData.Select(m => m[1]).ToArray());
-                            SimpleLinearRegression reg2 = ols.Learn(selectedData.Select(m => m[0]).ToArray(), selectedData.Select(m => m[2]).ToArray());
-                            SimpleLinearRegression reg3 = ols.Learn(selectedData.Select(m => m[3]).ToArray(), selectedData.Select(m => m[2]).ToArray());
-
-                            operationGroupList.ForEach(row => {
-                                double regL1 = reg1.Transform(row.TrainedPerformance.Profit) - row.TrainedPerformance.LossRate - _defaultInterceptOffset;
-                                double regL2 = reg1.Transform(row.TrainedPerformance.Profit) - row.TestedPerformance.LossRate - _defaultInterceptOffset;
-                                double regL3 = reg1.Transform(row.TestedPerformance.Profit) - row.TestedPerformance.LossRate - _defaultInterceptOffset;
-
-                                if (regL1 > 0 && regL2 > 0 && regL3 > 0)
-                                    row.TestedPerformance.Score = regL1 + regL2 + regL3;
-                                else
-                                    row.TestedPerformance.Score = 0;
-
-                            });
-
-                            IEnumerable<SavedModel> selected = operationGroupList.OrderByDescending(m => m.TestedPerformance.Score).ThenByDescending(m => m.TrainedPerformance.Profit).Take(_saveTop * 3);
-                            minProfit = selected.Min(m => m.TrainedPerformance.Profit);
-
-                            intermediateFiltered.AddRange(selected);
-                            savedFiltered.AddRange(selected.Take(_saveTop).ToList());
+                            intermediateFiltered.AddRange(verifiedModels);
+                            savedFiltered.AddRange(verifiedModels.Take(_saveTop).ToList());
                         }
                         else {
                             intermediateFiltered.AddRange(operationGroupList);
@@ -334,10 +349,22 @@ namespace simple_rsi_trader.Classes
                 else
                     break;
             }
+
+            List<SavedModel> finalSavedFiltered = new();
+
+            _parametersSaved.GroupBy(m => m.Parameters.Operation).ToList().ForEach(operationGroup => {
+                List<SavedModel> operationGroupList = operationGroup.SelectDistinct();
+                IEnumerable<SavedModel> verifiedModels = GetVerifiedModels(operationGroupList);
+                finalSavedFiltered.AddRange(verifiedModels.Take(_saveTop).ToList());
+            });
+
+            SaveModels(finalSavedFiltered);
+
         }
 
         public void StartOptimization(int randomInitCount, int degreeOfParallelism = -1) {
 
+            
             int degOfParal = degreeOfParallelism == -1 ? Environment.ProcessorCount : degreeOfParallelism;
             List<ParametersModel> initParameters = GenerateInitPoints(randomInitCount);
 
@@ -346,7 +373,7 @@ namespace simple_rsi_trader.Classes
             if (savedModels.Count != 0) {
                 _modelsLeft += savedModels.Count;
                 OptimizationRunner(savedModels, degOfParal);
-            }
+            }          
 
             OptimizationRunner(initParameters, degOfParal);
 

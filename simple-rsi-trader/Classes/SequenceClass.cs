@@ -13,6 +13,8 @@ namespace simple_rsi_trader.Classes
 
         public SequenceClass(DataModel[] before, DataModel[]? after)
         {
+            CurrentClosePrice = before[^1].Data[(int)DataColumn.Close];
+
             if (after != null) {
                 EndPeriodClosePrice = after[^1].Data[(int)DataColumn.Close];
 
@@ -37,15 +39,14 @@ namespace simple_rsi_trader.Classes
             }
 
 
-            CurrentClosePrice = before[^1].Data[(int)DataColumn.Close];
             Id = before[^1].Id;
             Date = before[^1].Date;
 
             RsiSequence = before.Select(m => m.Data[(int)DataColumn.Rsi]).ToArray();
         }
 
-        public bool AllowBuy { get; private set; }
-        public bool AllowSell { get; private set; }
+        public bool AllowBuy { get; private set; } = true;
+        public bool AllowSell { get; private set; } = true;
 
         public int Id { get; private set; }
 

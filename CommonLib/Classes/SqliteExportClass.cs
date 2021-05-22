@@ -35,14 +35,18 @@ namespace CommonLib.Classes
             using var connection = new SqliteConnection(_connectionString);
             connection.Open();
 
-            using var command = connection.CreateCommand();
-            command.CommandText = sqlQuery;
+            try {
+                using var command = connection.CreateCommand();
+                command.CommandText = sqlQuery;
 
-            command.ExecuteNonQuery();
-            command.Dispose();
-
-            connection.Close();
-            connection.Dispose();
+                command.ExecuteNonQuery();
+                command.Dispose();
+            }
+            catch { }
+            finally {
+                connection.Close();
+                connection.Dispose();
+            }
         }
 
         public void PushInstrumentData(DataModel[] data) {

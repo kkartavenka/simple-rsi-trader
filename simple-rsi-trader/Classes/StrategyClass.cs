@@ -108,7 +108,8 @@ namespace simple_rsi_trader.Classes
                         nonFirstHighestPrice: sequence.NonFirstHighestPrice,
                         nonFirstLowestPrice: sequence.NonFirstLowestPrice);
 
-                    export.Add(new(id: _testSet[rsiPeriod[0]][i].Id, operation: _operation, prediction: prediction));
+                    if (i + 1 < _testSet[rsiPeriod[0]].Length)
+                        export.Add(new(id: _testSet[rsiPeriod[0]][i + 1].Id, operation: _operation, prediction: prediction));
 
                     var result = order.AssessProfitFromOrder(operation: _operation, stopLoss: prediction.StopLossDistance, takeProfit: prediction.TakeProfitDistance, commission: _commission);
                     if (result.outcome != ActionOutcome.NoAction) {

@@ -12,11 +12,13 @@ namespace simple_rsi_trader.Models
             PointStruct stopLoss, 
             PointStruct takeProfit, 
             PointStruct rsiLimits,
+            PointStruct rsquaredCutOff,
             double[] weights, 
             double[] offset,
             int indicatorLastPointSequence, 
             OperationType operation)
         {
+            RSquaredCutOff = rsquaredCutOff;
             RsiLimits = rsiLimits;
             RsiPeriod = rsiPeriod;
             StopLoss = stopLoss;
@@ -26,7 +28,7 @@ namespace simple_rsi_trader.Models
             Operation = operation;
             IndicatorLastPointSequence = indicatorLastPointSequence;
 
-            ParametersCount = _fixedOffset + weights.Length + Offset.Length;
+            ParametersCount = _fixedOffset + weights.Length + Offset.Length + 1;
         }
 
         public int IndicatorLastPointSequence { get; set; }
@@ -39,6 +41,7 @@ namespace simple_rsi_trader.Models
         public PointStruct StopLoss { get; set; }
         public PointStruct TakeProfit { get; set; }
         public PointStruct RsiLimits { get; set; }
+        public PointStruct RSquaredCutOff { get; set; }
         public double[] Weights { get; set; }
 
         public void ToOptimizableArray()
@@ -54,6 +57,8 @@ namespace simple_rsi_trader.Models
             OptimizableArray[(int)OptimizingParameters.Offset0] = Offset[0];
             OptimizableArray[(int)OptimizingParameters.Offset1] = Offset[1];
             OptimizableArray[(int)OptimizingParameters.Offset2] = Offset[2];
+
+            OptimizableArray[(int)OptimizingParameters.RSquaredCutOff] = RSquaredCutOff.Value;
         }
 
         public void ToModel(double[] values)
@@ -67,6 +72,8 @@ namespace simple_rsi_trader.Models
             Offset[0] = values[(int)OptimizingParameters.Offset0];
             Offset[1] = values[(int)OptimizingParameters.Offset1];
             Offset[2] = values[(int)OptimizingParameters.Offset2];
+
+            RSquaredCutOff = new PointStruct(range: RSquaredCutOff.Range, val: values[(int)OptimizingParameters.RSquaredCutOff]);
         }
     }
 }

@@ -87,14 +87,14 @@ namespace simple_rsi_trader.Classes
                     double[] expectedRsi = reg.Transform(x);
                     double r2 = expectedRsi.RSquared(rsiSequence);
 
-                    if (r2 < 0.25)
+                    if (r2 < weights[(int)OptimizingParameters.RSquaredCutOff])
                         returnVar = false;
                 }
                 else if (reg.Slope < 0 && parameter.Operation == OperationType.Buy) {
                     double[] expectedRsi = reg.Transform(x);
                     double r2 = expectedRsi.RSquared(rsiSequence);
 
-                    if (r2 < 0.25)
+                    if (r2 < weights[(int)OptimizingParameters.RSquaredCutOff])
                         returnVar = false;
                 }
                 else
@@ -111,7 +111,7 @@ namespace simple_rsi_trader.Classes
                 limitOrder = sequence.CurrentClosePrice
                     + sequence.CurrentClosePrice * weights[(int)OptimizingParameters.Offset0]
                     - weights[(int)OptimizingParameters.Offset1] * sequence.RsiSequence[^1]
-                    - weights[(int)OptimizingParameters.Offset2] * sequence.RsiSequence[^1] * sequence.RsiSequence[^1];
+                    /*- weights[(int)OptimizingParameters.Offset2] * sequence.RsiSequence[^1] * sequence.RsiSequence[^1]*/;
 
                 if (limitOrder < sequence.CurrentClosePrice && !isTraining)
                     limitOrder = sequence.CurrentClosePrice;
@@ -120,7 +120,7 @@ namespace simple_rsi_trader.Classes
                 limitOrder = sequence.CurrentClosePrice
                     - sequence.CurrentClosePrice * weights[(int)OptimizingParameters.Offset0]
                     + weights[(int)OptimizingParameters.Offset1] * (100 - sequence.RsiSequence[^1])
-                    + +weights[(int)OptimizingParameters.Offset2] * (100 - sequence.RsiSequence[^1]) * (100 - sequence.RsiSequence[^1]);
+                    /*+weights[(int)OptimizingParameters.Offset2] * (100 - sequence.RsiSequence[^1]) * (100 - sequence.RsiSequence[^1])*/;
 
                 if (limitOrder > sequence.CurrentClosePrice && !isTraining)
                     limitOrder = sequence.CurrentClosePrice;

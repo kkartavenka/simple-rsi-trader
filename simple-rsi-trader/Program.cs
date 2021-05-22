@@ -13,7 +13,7 @@ namespace simple_rsi_trader
     class Program
     {
         static readonly int _degreeOfParallelism = Environment.ProcessorCount;
-        static readonly int _saveTopModelCount = 50;
+        static readonly int _saveTopModelCount = 150;
 
         #region Training and validation
 
@@ -24,8 +24,8 @@ namespace simple_rsi_trader
 
         #region Parameters range setup
 
-        static readonly IntRangeStruct _lastRsiSequence = new(5, 50);
-        static readonly IntRangeStruct _rsiRange = new(5, 20);
+        static readonly IntRangeStruct _lastRsiSequence = new(4, 20);
+        static readonly IntRangeStruct _rsiRange = new(10, 20);
 
         static readonly DoubleRangeStruct _rsiBuyLimits = new(10, 70);
         static readonly DoubleRangeStruct _rsiSellLimits = new(30, 90);
@@ -35,15 +35,16 @@ namespace simple_rsi_trader
         #region Data source location and import restrictions
 
         static readonly string _dirDataPath = @".\..\..\..\..\Data";
-        static readonly DateTime _restrictByDate = new(2000, 01, 01);
+        static readonly DateTime _restrictByDate = new(2010, 01, 01);// new(2000, 01, 01);
         static readonly List<SignalModel> _dailyCharts = new()
         {
-            new(name: "USDJPY1440.csv", commission: 0.007, stopLossRange: new(10, 40), takeProfitRange: new(40, 300), randomInitPoint: 1000000, datasetInfo: new(validationSize: 0.2, testSize: _testSize)),
-            new(name: "EURUSD1440.csv", commission: 0.00007, stopLossRange: new(10, 80), takeProfitRange: new(70, 500), randomInitPoint: 1000000, datasetInfo: new(validationSize: 0.2, testSize: _testSize)),
+            new(name: "USDJPY1440.csv", commission: 0.007, stopLossRange: new(10, 40), takeProfitRange: new(40, 300), randomInitPoint: 100000, datasetInfo: new(validationSize: 0.3, testSize: _testSize)),
+            new(name: "EURUSD1440.csv", commission: 0.00007, stopLossRange: new(10, 80), takeProfitRange: new(70, 500), randomInitPoint: 500000, datasetInfo: new(validationSize: 0.3, testSize: _testSize)),
             //new(name: "NATGAS1440.csv", commission: 0.003, stopLossRange: new(10, 30), takeProfitRange: new(30, 500), randomInitPoint: 100000, datasetInfo: new(validationSize: 0.2, testSize: _testSize)),
             //new(name: "XPDUSD1440.csv", commission: 4.31, stopLossRange: new(3, 12), takeProfitRange: new(20, 80), randomInitPoint: 100000, datasetInfo: new(validationSize: 0.2, testSize: _testSize)),
-            new(name: "XAUUSD1440.csv", commission: 0.3, stopLossRange: new(10, 40), takeProfitRange: new(40, 400), randomInitPoint: 1000000, datasetInfo: new(validationSize: 0.1, testSize: _testSize)),
-            new(name: "GBPUSD1440.csv", commission: 0.00009, stopLossRange: new(20, 80), takeProfitRange: new(80, 400), randomInitPoint: 1000000, datasetInfo: new(validationSize: 0.1, testSize: _testSize)),
+            new(name: "GBPUSD1440.csv", commission: 0.00009, stopLossRange: new(20, 80), takeProfitRange: new(80, 400), randomInitPoint: 5000000, datasetInfo: new(validationSize: 0.3, testSize: _testSize)),
+            new(name: "XAUUSD1440.csv", commission: 0.3, stopLossRange: new(10, 40), takeProfitRange: new(40, 400), randomInitPoint: 200000, datasetInfo: new(validationSize: 0.3, testSize: _testSize)),
+            
             //new(name: "XAUUSD60.csv", commission: 0.3, stopLossRange: new(10, 40), takeProfitRange: new(40, 400), randomInitPoint: 50000, datasetInfo: new(validationSize: 0.1, testSize: _testSize))
         };
 
