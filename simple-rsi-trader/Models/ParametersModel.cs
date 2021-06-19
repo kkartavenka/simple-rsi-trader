@@ -16,7 +16,9 @@ namespace simple_rsi_trader.Models
             double[] weights, 
             double[] offset,
             int indicatorLastPointSequence, 
-            OperationType operation)
+            OperationType operation,
+            double standardDeviationCorrection,
+            double rsiSlopeFitCorrection)
         {
             RSquaredCutOff = rsquaredCutOff;
             RsiLimits = rsiLimits;
@@ -27,8 +29,10 @@ namespace simple_rsi_trader.Models
             Offset = offset;
             Operation = operation;
             IndicatorLastPointSequence = indicatorLastPointSequence;
+            StandardDeviationCorrection = standardDeviationCorrection;
+            RsiSlopeFitCorrection = rsiSlopeFitCorrection;
 
-            ParametersCount = _fixedOffset + weights.Length + Offset.Length + 1;
+            ParametersCount = _fixedOffset + weights.Length + Offset.Length + 3;
         }
 
         public int IndicatorLastPointSequence { get; set; }
@@ -43,6 +47,8 @@ namespace simple_rsi_trader.Models
         public PointStruct RsiLimits { get; set; }
         public PointStruct RSquaredCutOff { get; set; }
         public double[] Weights { get; set; }
+        public double StandardDeviationCorrection { get; set; }
+        public double RsiSlopeFitCorrection { get; set; }
 
         public void ToOptimizableArray()
         {
@@ -57,8 +63,13 @@ namespace simple_rsi_trader.Models
             OptimizableArray[(int)OptimizingParameters.Offset0] = Offset[0];
             OptimizableArray[(int)OptimizingParameters.Offset1] = Offset[1];
             OptimizableArray[(int)OptimizingParameters.Offset2] = Offset[2];
+            OptimizableArray[(int)OptimizingParameters.Offset3] = Offset[3];
 
             OptimizableArray[(int)OptimizingParameters.RSquaredCutOff] = RSquaredCutOff.Value;
+
+            OptimizableArray[(int)OptimizingParameters.ChangeEmaCorrection] = StandardDeviationCorrection;
+            OptimizableArray[(int)OptimizingParameters.RsiSlopeFitCorrection] = RsiSlopeFitCorrection;
+
         }
 
         public void ToModel(double[] values)
@@ -72,8 +83,13 @@ namespace simple_rsi_trader.Models
             Offset[0] = values[(int)OptimizingParameters.Offset0];
             Offset[1] = values[(int)OptimizingParameters.Offset1];
             Offset[2] = values[(int)OptimizingParameters.Offset2];
+            Offset[3] = values[(int)OptimizingParameters.Offset3];
 
             RSquaredCutOff = new PointStruct(range: RSquaredCutOff.Range, val: values[(int)OptimizingParameters.RSquaredCutOff]);
+
+            StandardDeviationCorrection = OptimizableArray[(int)OptimizingParameters.ChangeEmaCorrection];
+            RsiSlopeFitCorrection = OptimizableArray[(int)OptimizingParameters.RsiSlopeFitCorrection];
+
         }
     }
 }

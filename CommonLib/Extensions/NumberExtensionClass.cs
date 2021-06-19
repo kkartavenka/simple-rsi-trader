@@ -19,7 +19,10 @@ namespace CommonLib.Extensions
 
         public static int GetRandomInt(this int x) => (int)((double)x).GetRandomDouble();
 
-        public static double ScaleMinMax(this double x, DoubleRangeStruct observedRange, DoubleRangeStruct scale) =>
-            scale.Min + (x - observedRange.Min) * (scale.Max - scale.Min) / (observedRange.Max - observedRange.Min);
+        public static double ScaleMinMax(this double x, DoubleRangeStruct from, DoubleRangeStruct to) =>
+            to.Min + (x - from.Min) * (to.Max - to.Min) / (from.Max - from.Min);
+
+        public static double Standardize(this double x, double sd, double mean) => (x - mean) / sd;
+        public static double DeStandardize(this double x, double sd, double mean) => x * sd + mean;
     }
 }
