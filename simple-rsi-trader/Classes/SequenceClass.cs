@@ -1,4 +1,6 @@
-﻿using CommonLib.Models;
+﻿using Accord.Statistics;
+using Accord.Statistics.Kernels;
+using CommonLib.Models;
 using System;
 using System.Linq;
 using static CommonLib.Models.DataModel;
@@ -13,6 +15,12 @@ namespace simple_rsi_trader.Classes
 
         public SequenceClass(DataModel[] before, DataModel[]? after)
         {
+            var changes = new double[before.Length];
+            for (int i = 1; i < before.Length; i++)
+                changes[i - 1] = Math.Abs(before[i].Data[(int)DataColumn.Close] - before[i - 1].Data[(int)DataColumn.Close]);
+
+            ChangeEMA = Measures.ExponentialWeightedMean(changes, 0.2);
+
             CurrentClosePrice = before[^1].Data[(int)DataColumn.Close];
 
             if (after != null) {
@@ -52,6 +60,8 @@ namespace simple_rsi_trader.Classes
 
         public double CurrentClosePrice { get; private set; }
         public double EndPeriodClosePrice { get; private set; }
+        public double ChangeEMA { get; private set; } 
+
 
         public DateTime Date { get; private set; }
 

@@ -12,22 +12,21 @@ namespace simple_rsi_trader.Classes
 {
     public class StrategyClass
     {
-        private readonly double _orderDistance = 10;
         private readonly double _commission;
         private readonly List<SavedModel> _models;
         private readonly int _roundPoint;
         private readonly OperationType _operation;
+        private readonly double _distanceBetweenOrders;
 
-        private Dictionary<int, SequenceClass[]> _testSet;
+        private Dictionary<int, ReadOnlyMemory<SequenceClass>> _testSet;
         private Dictionary<int, SequenceClass> _predictionSet;
-        public StrategyClass(IEnumerable<SavedModel> models, OperationType operation, int roundPoint, double commission) {
+        public StrategyClass(IEnumerable<SavedModel> models, OperationType operation, int roundPoint, double commission, double distanceBetweenOrders) {
+            _distanceBetweenOrders = distanceBetweenOrders;
             _commission = commission;
             _roundPoint = roundPoint;
             _operation = operation;
             _models = models.ToList();
             _models.ForEach(m => m.Parameters.ToOptimizableArray());
-
-            _orderDistance = models.Select(m => m.Parameters.StopLoss.Value).ToArray().Mean() * 0.66;
         }
 
         private List<PredictionStruct> GetPredictions(Dictionary<int, SequenceClass> sequence) {
@@ -35,19 +34,27 @@ namespace simple_rsi_trader.Classes
             List<PredictionStruct> returnVar = new();
 
             _models.ForEach(m => {
-                if (sequence[m.Parameters.RsiPeriod].CheckActivation(m.Parameters.OptimizableArray, m.Parameters))
-                    preparedOrders.Add(sequence[m.Parameters.RsiPeriod].GetOrder(m.Parameters.OptimizableArray, m.Parameters, _roundPoint, m.TestedPerformance.Score));
+                ActivationReturnStruct activationStatus = sequence[m.Parameters.RsiPeriod].CheckActivation(m.Parameters.OptimizableArray, m.Parameters);
+                if (activationStatus.Activated)
+                    preparedOrders.Add(sequence[m.Parameters.RsiPeriod].GetOrder(
+                        weights: m.Parameters.OptimizableArray,
+                        parameter: m.Parameters,
+                        roundPoint: _roundPoint,
+                        score: m.TestedPerformance.Score,
+                        activationStatus: activationStatus));
             });
 
             if (preparedOrders.Count == 0)
                 return returnVar;
+
+            double orderDistance = sequence.First().Value.CurrentClosePrice * _distanceBetweenOrders;
 
             if (_operation == OperationType.Sell) {
                 preparedOrders = preparedOrders.OrderBy(m => m.LimitOrder).ThenBy(m => m.StopLoss).ToList();
                 double minLimitOrder = preparedOrders.First().LimitOrder;
 
                 while (preparedOrders.Where(m => m.LimitOrder >= minLimitOrder).Count() > 0) {
-                    List<PredictionStruct> similarOrders = preparedOrders.Where(m => m.LimitOrder >= minLimitOrder && m.LimitOrder < minLimitOrder + _orderDistance).ToList();
+                    List<PredictionStruct> similarOrders = preparedOrders.Where(m => m.LimitOrder >= minLimitOrder && m.LimitOrder < minLimitOrder + orderDistance).ToList();
                     returnVar.Add(similarOrders.OrderByDescending(m => m.Score).First());
 
                     List<PredictionStruct> nextPoints = preparedOrders.Where(m => m.LimitOrder > similarOrders.Max(m => m.LimitOrder)).ToList();
@@ -59,7 +66,7 @@ namespace simple_rsi_trader.Classes
 
                 double maxLimitOrder = preparedOrders.First().LimitOrder;
                 while (preparedOrders.Where(m=>m.LimitOrder <= maxLimitOrder).Count() > 0) {
-                    List<PredictionStruct> similarOrders = preparedOrders.Where(m => m.LimitOrder <= maxLimitOrder && m.LimitOrder > maxLimitOrder - _orderDistance).ToList();
+                    List<PredictionStruct> similarOrders = preparedOrders.Where(m => m.LimitOrder <= maxLimitOrder && m.LimitOrder > maxLimitOrder - orderDistance).ToList();
                     returnVar.Add(similarOrders.OrderByDescending(m => m.Score).First());
 
                     List<PredictionStruct> nextPoints = preparedOrders.Where(m => m.LimitOrder < similarOrders.Min(m => m.LimitOrder)).ToList();
@@ -70,7 +77,7 @@ namespace simple_rsi_trader.Classes
             return returnVar;
         }
 
-        public void LoadSequences(Dictionary<int, SequenceClass[]> testSet) => _testSet = testSet;
+        public void LoadSequences(Dictionary<int, ReadOnlyMemory<SequenceClass>> testSet) => _testSet = testSet;
 
         public void LoadSequence(Dictionary<int, SequenceClass> predictionSet) => _predictionSet = predictionSet;
 
@@ -89,13 +96,11 @@ namespace simple_rsi_trader.Classes
 
             for (int i = 0; i < itemCount; i++) {
                 Dictionary<int, SequenceClass> preparedSequence = new();
-                rsiPeriod.ForEach(rsiPeriod => preparedSequence.Add(rsiPeriod, _testSet[rsiPeriod][i]));
+                rsiPeriod.ForEach(rsiPeriod => preparedSequence.Add(rsiPeriod, _testSet[rsiPeriod].Span[i]));
 
                 List<PredictionStruct> predictions = GetPredictions(preparedSequence);
 
                 SequenceClass sequence = preparedSequence.FirstOrDefault().Value;
-
-                actionCount += predictions.Count;
 
                 predictions.ForEach(prediction => {
                     OrderModel order = new(
@@ -107,20 +112,24 @@ namespace simple_rsi_trader.Classes
                         highestPrice: sequence.HighestPrice,
                         nonFirstHighestPrice: sequence.NonFirstHighestPrice,
                         nonFirstLowestPrice: sequence.NonFirstLowestPrice);
-
                     if (i + 1 < _testSet[rsiPeriod[0]].Length)
-                        export.Add(new(id: _testSet[rsiPeriod[0]][i + 1].Id, operation: _operation, prediction: prediction));
+                        export.Add(new(id: _testSet[rsiPeriod[0]].Span[i + 1].Id, operation: _operation, prediction: prediction));
 
-                    var result = order.AssessProfitFromOrder(operation: _operation, stopLoss: prediction.StopLossDistance, takeProfit: prediction.TakeProfitDistance, commission: _commission);
+                    (double profit, ActionOutcome outcome) result = order.AssessProfitFromOrder(
+                        operation: _operation,
+                        stopLoss: prediction.StopLossDistance,
+                        takeProfit: prediction.TakeProfitDistance,
+                        commission: _commission);
+
                     if (result.outcome != ActionOutcome.NoAction) {
-
+                        actionCount++;
                         profit += result.profit;
                     }
                 });
             }
 
             IsSuccess = profit > 0;
-            Profit = profit / actionCount;
+            Profit = profit;// actionCount != 0 ? profit / actionCount : 0;
 
             return export;
         }

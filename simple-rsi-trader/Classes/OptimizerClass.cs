@@ -3,10 +3,8 @@ using CommonLib.Models;
 using simple_rsi_trader.Models;
 using System;
 using System.Collections.Generic;
-using System.IO;
 using static CommonLib.Enums.Enums;
 using static simple_rsi_trader.Classes.OperationClass;
-using static simple_rsi_trader.Models.ParametersModel;
 
 namespace simple_rsi_trader.Classes
 {
@@ -16,121 +14,123 @@ namespace simple_rsi_trader.Classes
 
         private const double _minWinRate = 0.01;
         private readonly ParametersModel _parameter;
-        private SequenceClass[] _sequences;
         private readonly double _commission;
         private readonly int _roundPoint;
         private bool _roundOrder = false;
-        private int _iteration = -1;
         private ExecutionType _executionType;
         private bool _isTraining;
+        ReadOnlyMemory<SequenceClass> _sequenceMemory;
 
-        public OptimizerClass(SequenceClass[] sequences, ParametersModel parameter, double commission, int roundPoint) {
+        public OptimizerClass(ReadOnlyMemory<SequenceClass> sequences, ParametersModel parameter, double commission, int roundPoint) {
             _parameter = parameter;
             _isTraining = true;
             _roundPoint = roundPoint;
             _commission = commission;
-            _sequences = sequences;
+            _sequenceMemory = sequences;
         }
 
         Func<double[], double> function;
         public Dictionary<ExecutionType, PerformanceModel> Performance { get; private set; } = new();
 
-        private double[] EnforceConstrains(double[] weights) {
-            double[] returnVar = weights;
+        private Span<double> EnforceConstrains(Span<double> weights) {
+            if (weights[(int)OptimizingParameters.StopLoss] < _parameter.StopLoss.Range.Min)
+                weights[(int)OptimizingParameters.StopLoss] = _parameter.StopLoss.Range.Min;
+            else if (weights[(int)OptimizingParameters.StopLoss] > _parameter.StopLoss.Range.Max)
+                weights[(int)OptimizingParameters.StopLoss] = _parameter.StopLoss.Range.Max;
 
-            if (returnVar[(int)OptimizingParameters.StopLoss] < _parameter.StopLoss.Range.Min)
-                returnVar[(int)OptimizingParameters.StopLoss] = _parameter.StopLoss.Range.Min;
-            else if (returnVar[(int)OptimizingParameters.StopLoss] > _parameter.StopLoss.Range.Max)
-                returnVar[(int)OptimizingParameters.StopLoss] = _parameter.StopLoss.Range.Max;
-
-            if (returnVar[(int)OptimizingParameters.TakeProfit] < _parameter.TakeProfit.Range.Min)
-                returnVar[(int)OptimizingParameters.TakeProfit] = _parameter.TakeProfit.Range.Min;
-            else if (returnVar[(int)OptimizingParameters.TakeProfit] > _parameter.TakeProfit.Range.Max)
-                returnVar[(int)OptimizingParameters.TakeProfit] = _parameter.TakeProfit.Range.Max;
+            if (weights[(int)OptimizingParameters.TakeProfit] < _parameter.TakeProfit.Range.Min)
+                weights[(int)OptimizingParameters.TakeProfit] = _parameter.TakeProfit.Range.Min;
 
             if (_parameter.Operation == OperationType.Buy) {
-                if (returnVar[(int)OptimizingParameters.Weight0] > _parameter.RsiLimits.Range.Max)
-                    returnVar[(int)OptimizingParameters.Weight0] = _parameter.RsiLimits.Range.Max;
+                if (weights[(int)OptimizingParameters.Weight0] > _parameter.RsiLimits.Range.Max)
+                    weights[(int)OptimizingParameters.Weight0] = _parameter.RsiLimits.Range.Max;
 
-                double recentRsiCut = returnVar[(int)OptimizingParameters.Weight0] - _parameter.IndicatorLastPointSequence * returnVar[(int)OptimizingParameters.Weight1];
+                double recentRsiCut = weights[(int)OptimizingParameters.Weight0] - _parameter.IndicatorLastPointSequence * weights[(int)OptimizingParameters.Weight1];
                 if (recentRsiCut > _parameter.RsiLimits.Range.Max)
-                    returnVar[(int)OptimizingParameters.Weight1] = (_parameter.RsiLimits.Range.Max - returnVar[(int)OptimizingParameters.Weight0]) / _parameter.IndicatorLastPointSequence;
+                    weights[(int)OptimizingParameters.Weight1] = (_parameter.RsiLimits.Range.Max - weights[(int)OptimizingParameters.Weight0]) / _parameter.IndicatorLastPointSequence;
             }
             else {
-                if (returnVar[(int)OptimizingParameters.Weight0] < _parameter.RsiLimits.Range.Min)
-                    returnVar[(int)OptimizingParameters.Weight0] = _parameter.RsiLimits.Range.Min;
+                if (weights[(int)OptimizingParameters.Weight0] < _parameter.RsiLimits.Range.Min)
+                    weights[(int)OptimizingParameters.Weight0] = _parameter.RsiLimits.Range.Min;
 
-                double recentRsiCut = returnVar[(int)OptimizingParameters.Weight0] + _parameter.IndicatorLastPointSequence * returnVar[(int)OptimizingParameters.Weight1];
+                double recentRsiCut = weights[(int)OptimizingParameters.Weight0] + _parameter.IndicatorLastPointSequence * weights[(int)OptimizingParameters.Weight1];
                 if (recentRsiCut < _parameter.RsiLimits.Range.Min)
-                    returnVar[(int)OptimizingParameters.Weight1] = (returnVar[(int)OptimizingParameters.Weight0] - _parameter.RsiLimits.Range.Min) / _parameter.IndicatorLastPointSequence;
+                    weights[(int)OptimizingParameters.Weight1] = (weights[(int)OptimizingParameters.Weight0] - _parameter.RsiLimits.Range.Min) / _parameter.IndicatorLastPointSequence;
             }
 
-            if (returnVar[(int)OptimizingParameters.RSquaredCutOff] < _parameter.RSquaredCutOff.Range.Min)
-                returnVar[(int)OptimizingParameters.RSquaredCutOff] = _parameter.RSquaredCutOff.Range.Min;
+            if (weights[(int)OptimizingParameters.RSquaredCutOff] < _parameter.RSquaredCutOff.Range.Min)
+                weights[(int)OptimizingParameters.RSquaredCutOff] = _parameter.RSquaredCutOff.Range.Min;
 
-            return returnVar;
+            return weights;
         }
 
         private double Evaluate(double[] weights) {
-            _iteration++;
+            var weightsSpan = new Span<double>(weights);
 
             if (_executionType == ExecutionType.Train) {
                 Performance[_executionType] = new();
-                weights = EnforceConstrains(weights);
+                weightsSpan = EnforceConstrains(weightsSpan);
             }
 
-            if (_roundOrder) {
-                weights[(int)OptimizingParameters.StopLoss] = Math.Round(weights[(int)OptimizingParameters.StopLoss], _roundPoint);
-                weights[(int)OptimizingParameters.TakeProfit] = Math.Round(weights[(int)OptimizingParameters.TakeProfit], _roundPoint);
-            }
+            ReadOnlySpan<SequenceClass> sequenceSpan = _sequenceMemory.Span;
 
-            for (int i = 0; i < _sequences.Length; i++) {
+            for (int i = 0; i < _sequenceMemory.Length; i++) {
                 
-                bool condition = (_sequences[i].AllowBuy && _parameter.Operation == OperationType.Buy) || (_sequences[i].AllowSell && _parameter.Operation == OperationType.Sell);
+                bool condition = (sequenceSpan[i].AllowBuy && _parameter.Operation == OperationType.Buy) || (sequenceSpan[i].AllowSell && _parameter.Operation == OperationType.Sell);
                 
-                if (condition && _sequences[i].CheckActivation(weights, _parameter)) {
-                    double limitOrder = _sequences[i].GetLimitOrder(weights, _parameter, _roundOrder, _roundPoint, _isTraining);
+                if (condition) {
+                    var activatedStatus = sequenceSpan[i].CheckActivation(weightsSpan, _parameter);
 
-                    OrderModel order = new(
-                        endPeriodClosePrice: _sequences[i].EndPeriodClosePrice,
-                        order: limitOrder,
-                        firstLow: _sequences[i].FirstPeriodLowPrice,
-                        firstHigh: _sequences[i].FirstPeriodHighPrice,
-                        lowestPrice: _sequences[i].LowestPrice,
-                        highestPrice: _sequences[i].HighestPrice,
-                        nonFirstHighestPrice: _sequences[i].NonFirstHighestPrice,
-                        nonFirstLowestPrice: _sequences[i].NonFirstLowestPrice);
+                    if (activatedStatus.Activated) {
+                        double limitOrder = sequenceSpan[i].GetLimitOrder(
+                            weights: weightsSpan,
+                            parameter: _parameter,
+                            round: _roundOrder,
+                            roundPoint: _roundPoint,
+                            isTraining: _isTraining,
+                            activationStatus: activatedStatus);
 
-                    (double profit, ActionOutcome outcome) = order.AssessProfitFromOrder(
-                        operation: _parameter.Operation,
-                        stopLoss: weights[(int)OptimizingParameters.StopLoss],
-                        takeProfit: weights[(int)OptimizingParameters.TakeProfit],
-                        commission: _commission);
+                        OrderModel order = new(
+                            endPeriodClosePrice: sequenceSpan[i].EndPeriodClosePrice,
+                            order: limitOrder,
+                            firstLow: sequenceSpan[i].FirstPeriodLowPrice,
+                            firstHigh: sequenceSpan[i].FirstPeriodHighPrice,
+                            lowestPrice: sequenceSpan[i].LowestPrice,
+                            highestPrice: sequenceSpan[i].HighestPrice,
+                            nonFirstHighestPrice: sequenceSpan[i].NonFirstHighestPrice,
+                            nonFirstLowestPrice: sequenceSpan[i].NonFirstLowestPrice);
 
-                    switch (outcome) {
-                        case ActionOutcome.Failed:
-                            Performance[_executionType].ActionCount++;
-                            Performance[_executionType].LossCount++;
-                            Performance[_executionType].Profit += profit;
-                            break;
-                        case ActionOutcome.NoAction:
-                            Performance[_executionType].ActionCount++;
-                            break;
-                        case ActionOutcome.Success:
-                            Performance[_executionType].ActionCount++;
-                            Performance[_executionType].WinCount++;
-                            Performance[_executionType].Profit += profit;
-                            break;
+                        (double profit, ActionOutcome outcome) = order.AssessProfitFromOrder(
+                            operation: _parameter.Operation,
+                            stopLoss: _roundOrder ? Math.Round(weightsSpan[(int)OptimizingParameters.StopLoss] * sequenceSpan[i].CurrentClosePrice, _roundPoint) : weightsSpan[(int)OptimizingParameters.StopLoss] * sequenceSpan[i].CurrentClosePrice,
+                            takeProfit: _roundOrder ? Math.Round(weightsSpan[(int)OptimizingParameters.TakeProfit] * sequenceSpan[i].CurrentClosePrice, _roundPoint) : weightsSpan[(int)OptimizingParameters.TakeProfit] * sequenceSpan[i].CurrentClosePrice,
+                            commission: _commission);
+
+                        switch (outcome) {
+                            case ActionOutcome.Failed:
+                                Performance[_executionType].ActionCount++;
+                                Performance[_executionType].LossCount++;
+                                Performance[_executionType].Profit += profit;
+                                break;
+                            case ActionOutcome.NoAction:
+                                Performance[_executionType].ActionCount++;
+                                break;
+                            case ActionOutcome.Success:
+                                Performance[_executionType].ActionCount++;
+                                Performance[_executionType].WinCount++;
+                                Performance[_executionType].Profit += profit;
+                                break;
+                        }
                     }
                 }
             }
 
-            Performance[_executionType].CalculateMetrics(_commission, _sequences.Length);
+            Performance[_executionType].CalculateMetrics(_commission, sequenceSpan.Length);
             return Performance[_executionType].Score;
         }
 
-        public void LoadSequence(SequenceClass[] sequences, bool isTraining) {
-            _sequences = sequences;
+        public void LoadSequence(ReadOnlyMemory<SequenceClass> sequences, bool isTraining) {
+            _sequenceMemory = sequences;
             _isTraining = isTraining;
         }
 
@@ -158,7 +158,7 @@ namespace simple_rsi_trader.Classes
                 _roundOrder = true;
                 postTrainScore = Evaluate(solver.Solution);
 
-                if (Performance[_executionType].Profit > minTrainingScore && double.IsFinite(Performance[_executionType].WinRate) && Performance[ExecutionType.Train].Profit < 1000 && (double)Performance[_executionType].WinCount / _sequences.Length > _minWinRate) {
+                if (Performance[_executionType].Profit > minTrainingScore && double.IsFinite(Performance[_executionType].WinRate) && Performance[ExecutionType.Train].Profit < 1000 && (double)Performance[_executionType].WinCount / _sequenceMemory.Length > _minWinRate) {
                     IsSuccess = true;
                     _parameter.ToModel(solver.Solution);
                 }

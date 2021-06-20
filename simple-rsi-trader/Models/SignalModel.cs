@@ -20,5 +20,6 @@ namespace simple_rsi_trader.Models
         public int RandomInitPoint { get; private set; }
         public DoubleRangeStruct StopLossRange { get; private set; }
         public DoubleRangeStruct TakeProfitRange { get; private set; }
+
     }
 }
