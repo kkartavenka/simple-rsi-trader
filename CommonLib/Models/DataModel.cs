@@ -12,7 +12,10 @@ namespace CommonLib.Models
             TypicalPrice = 4, 
             Volume = 5,
 
-            Rsi = 6
+            Rsi = 6,
+
+            ClosePriceSlope = 7,
+            ClosePriceSlopeRSquared = 8
         };
 
         public DataModel(double[] data, DateTime date, int id)

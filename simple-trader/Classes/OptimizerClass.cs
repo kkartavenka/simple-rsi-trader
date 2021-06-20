@@ -1,13 +1,13 @@
 ﻿using Accord.Math.Optimization;
 using CommonLib.Enums;
 using CommonLib.Models;
-using simple_rsi_trader.Enums;
-using simple_rsi_trader.Models;
+using simple_trader.Enums;
+using simple_trader.Models;
 using System;
 using System.Collections.Generic;
-using static simple_rsi_trader.Classes.OperationClass;
+using static simple_trader.Classes.OperationClass;
 
-namespace simple_rsi_trader.Classes
+namespace simple_trader.Classes
 {
     public class OptimizerClass
     {
@@ -43,20 +43,13 @@ namespace simple_rsi_trader.Classes
                 weights[(int)OptimizingParameters.TakeProfit] = _parameter.TakeProfit.Range.Min;
 
             if (_parameter.Operation == OperationType.Buy) {
-                if (weights[(int)OptimizingParameters.Weight0] > _parameter.RsiLimits.Range.Max)
-                    weights[(int)OptimizingParameters.Weight0] = _parameter.RsiLimits.Range.Max;
+                if (weights[(int)OptimizingParameters.Slope] < _parameter.SlopeLimits.Range.Min)
+                    weights[(int)OptimizingParameters.Slope] = _parameter.SlopeLimits.Range.Min;
 
-                double recentRsiCut = weights[(int)OptimizingParameters.Weight0] - _parameter.IndicatorLastPointSequence * weights[(int)OptimizingParameters.Weight1];
-                if (recentRsiCut > _parameter.RsiLimits.Range.Max)
-                    weights[(int)OptimizingParameters.Weight1] = (_parameter.RsiLimits.Range.Max - weights[(int)OptimizingParameters.Weight0]) / _parameter.IndicatorLastPointSequence;
             }
             else {
-                if (weights[(int)OptimizingParameters.Weight0] < _parameter.RsiLimits.Range.Min)
-                    weights[(int)OptimizingParameters.Weight0] = _parameter.RsiLimits.Range.Min;
-
-                double recentRsiCut = weights[(int)OptimizingParameters.Weight0] + _parameter.IndicatorLastPointSequence * weights[(int)OptimizingParameters.Weight1];
-                if (recentRsiCut < _parameter.RsiLimits.Range.Min)
-                    weights[(int)OptimizingParameters.Weight1] = (weights[(int)OptimizingParameters.Weight0] - _parameter.RsiLimits.Range.Min) / _parameter.IndicatorLastPointSequence;
+                if (weights[(int)OptimizingParameters.Slope] > _parameter.SlopeLimits.Range.Max)
+                    weights[(int)OptimizingParameters.Slope] = _parameter.SlopeLimits.Range.Max;
             }
 
             if (weights[(int)OptimizingParameters.RSquaredCutOff] < _parameter.RSquaredCutOff.Range.Min)
@@ -80,7 +73,7 @@ namespace simple_rsi_trader.Classes
                 bool condition = (sequenceSpan[i].AllowBuy && _parameter.Operation == OperationType.Buy) || (sequenceSpan[i].AllowSell && _parameter.Operation == OperationType.Sell);
                 
                 if (condition) {
-                    var activatedStatus = sequenceSpan[i].CheckActivation(weightsSpan, _parameter);
+                    var activatedStatus = sequenceSpan[i].CheckActivation(slope: weightsSpan[(int)OptimizingParameters.Slope], rsquared: weightsSpan[(int)OptimizingParameters.RSquared], parameter: _parameter);
 
                     if (activatedStatus.Activated) {
                         double limitOrder = sequenceSpan[i].GetLimitOrder(

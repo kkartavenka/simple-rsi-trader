@@ -2,13 +2,13 @@
 using CommonLib.Enums;
 using CommonLib.Models;
 using CommonLib.Models.Export;
-using simple_rsi_trader.Models;
+using simple_trader.Models;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using static simple_rsi_trader.Classes.OperationClass;
+using static simple_trader.Classes.OperationClass;
 
-namespace simple_rsi_trader.Classes
+namespace simple_trader.Classes
 {
     public class StrategyClass
     {
@@ -34,9 +34,9 @@ namespace simple_rsi_trader.Classes
             List<PredictionStruct> returnVar = new();
 
             _models.ForEach(m => {
-                ActivationReturnStruct activationStatus = sequence[m.Parameters.RsiPeriod].CheckActivation(m.Parameters.OptimizableArray, m.Parameters);
+                ActivationReturnStruct activationStatus = sequence[m.Parameters.SequenceLength].CheckActivation(m.Parameters.SlopeLimits.Value, m.Parameters.RSquaredCutOff.Value, m.Parameters);
                 if (activationStatus.Activated)
-                    preparedOrders.Add(sequence[m.Parameters.RsiPeriod].GetOrder(
+                    preparedOrders.Add(sequence[m.Parameters.SequenceLength].GetOrder(
                         weights: m.Parameters.OptimizableArray,
                         parameter: m.Parameters,
                         roundPoint: _roundPoint,

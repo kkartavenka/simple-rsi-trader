@@ -2,7 +2,6 @@
 using CommonLib.Models;
 using CommonLib.Models.Range;
 using simple_rsi_trader.Classes;
-using simple_rsi_trader.Models;
 using System;
 using System.Collections.Generic;
 using System.IO;

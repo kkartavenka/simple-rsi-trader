@@ -1,4 +1,4 @@
-﻿using static CommonLib.Enums.Enums;
+﻿using CommonLib.Enums;
 
 namespace CommonLib.Models.Export
 {

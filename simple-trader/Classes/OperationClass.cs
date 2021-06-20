@@ -1,13 +1,13 @@
 ﻿using Accord.Statistics;
 using Accord.Statistics.Models.Regression.Linear;
 using CommonLib.Models;
-using simple_rsi_trader.Models;
+using simple_trader.Models;
 using System;
 using CommonLib.Extensions;
+using simple_trader.Enums;
 using CommonLib.Enums;
-using simple_rsi_trader.Enums;
 
-namespace simple_rsi_trader.Classes
+namespace simple_trader.Classes
 {
     public static class OperationClass
     {
@@ -58,56 +58,14 @@ namespace simple_rsi_trader.Classes
 
         }
 
-        public static ActivationReturnStruct CheckActivation(this SequenceClass sequence, ReadOnlySpan<double> weights, ParametersModel parameter) {
-            double[] rsiSequence = sequence.RsiSequence[^parameter.IndicatorLastPointSequence..];
-            var rsiSequenceSpan = new Span<double>(rsiSequence);
-            double[] x = new double[rsiSequence.Length];
+        public static ActivationReturnStruct CheckActivation(this SequenceClass sequence, double slope, double rsquared, ParametersModel parameter) {
 
-            for (int i = 0; i < x.Length; i++)
-                x[i] = i;
+            if (parameter.Operation == OperationType.Buy && sequence.ClosePriceSlope < slope && sequence.ClosePriceSlopeRSquared >= rsquared)
+                return new ActivationReturnStruct(activated: true, slope: sequence.ClosePriceSlope, rSquared: sequence.ClosePriceSlopeRSquared);
+            else if (parameter.Operation == OperationType.Sell && sequence.ClosePriceSlope > slope && sequence.ClosePriceSlopeRSquared >= rsquared)
+                return new ActivationReturnStruct(activated: true, slope: sequence.ClosePriceSlope, rSquared: sequence.ClosePriceSlopeRSquared);
 
-            int allowedPass = (int)Math.Round(rsiSequence.Length * 0.05);
-            int halfWay = (int)(rsiSequence.Length * 0.5);
-
-            for (int i = 0; i < rsiSequence.Length; i++) {
-                if (parameter.Operation == OperationType.Buy) {
-                    if (weights[(int)OptimizingParameters.Weight0] - weights[(int)OptimizingParameters.Weight1] * i < rsiSequenceSpan[i]) {
-                        if (allowedPass <= 0 || halfWay > i)
-                            return default;
-                        allowedPass--;
-                    }
-                }
-                else {
-                    if (weights[(int)OptimizingParameters.Weight0] + weights[(int)OptimizingParameters.Weight1] * i > rsiSequenceSpan[i]) {
-                        if (allowedPass <= 0 || halfWay > i)
-                            return default;
-                        allowedPass--;
-                    }
-                }
-            }
-
-            OrdinaryLeastSquares ols = new OrdinaryLeastSquares() { UseIntercept = true };
-            SimpleLinearRegression reg = ols.Learn(x, rsiSequence);
-            double r2;
-
-            if (reg.Slope > 0 && parameter.Operation == OperationType.Sell) {
-                var expectedRsi = new ReadOnlySpan<double>(reg.Transform(x));
-                r2 = expectedRsi.RSquared(rsiSequence);
-
-                if (r2 < weights[(int)OptimizingParameters.RSquaredCutOff])
-                    return default;
-            }
-            else if (reg.Slope < 0 && parameter.Operation == OperationType.Buy) {
-                var expectedRsi = new ReadOnlySpan<double>(reg.Transform(x));
-                r2 = expectedRsi.RSquared(rsiSequence);
-
-                if (r2 < weights[(int)OptimizingParameters.RSquaredCutOff])
-                    return default;
-            }
-            else
-                return default;
-
-            return new ActivationReturnStruct(activated: true, slope: reg.Slope, rSquared: r2);
+            return default;
         }
 
         public static double GetLimitOrder(this SequenceClass sequence, ReadOnlySpan<double> weights, ParametersModel parameter, bool round, int roundPoint, bool isTraining, ActivationReturnStruct activationStatus) {
@@ -167,7 +125,7 @@ namespace simple_rsi_trader.Classes
                     score: score);
         }
 
-        private static double RSquared(this ReadOnlySpan<double> expected, ReadOnlySpan<double> observed) {
+        public static double RSquared(this ReadOnlySpan<double> expected, ReadOnlySpan<double> observed) {
             double yMean = observed.Mean();
             double ssTot = 0;
             double ssRes = 0;
@@ -179,5 +137,7 @@ namespace simple_rsi_trader.Classes
 
             return 1 - (ssRes / ssTot);
         }
+
+        private static double RSquared(this ReadOnlySpan<double> expected, double[] observed) => expected.RSquared(new ReadOnlySpan<double>(observed));
     }
 }

@@ -1,7 +1,6 @@
-﻿using CommonLib.Models;
-using CommonLib.Models.Range;
+﻿using CommonLib.Models.Range;
 
-namespace simple_rsi_trader.Models
+namespace CommonLib.Models
 {
     public class SignalModel
     {

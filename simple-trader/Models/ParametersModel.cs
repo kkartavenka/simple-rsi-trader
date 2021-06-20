@@ -1,53 +1,53 @@
 ﻿using CommonLib.Enums;
 using CommonLib.Models;
-using simple_rsi_trader.Enums;
+using simple_trader.Enums;
 
-namespace simple_rsi_trader.Models
+namespace simple_trader.Models
 {
     public class ParametersModel
     {
         private const int _fixedOffset = 2;
 
         public ParametersModel(
-            int rsiPeriod,
+            int sequenceLength,
             PointStruct stopLoss, 
             PointStruct takeProfit, 
-            PointStruct rsiLimits,
+
+            PointStruct slopeLimits,
+            PointStruct slopeLimitsRSquared,
+            
             PointStruct rsquaredCutOff,
-            double[] weights, 
             double[] offset,
-            int indicatorLastPointSequence, 
             OperationType operation,
             double standardDeviationCorrection,
             double rsiSlopeFitCorrection)
         {
             RSquaredCutOff = rsquaredCutOff;
-            RsiLimits = rsiLimits;
-            RsiPeriod = rsiPeriod;
+            
+            SlopeLimits = slopeLimits;
+            SlopeLimitsRSquared = slopeLimitsRSquared;
+
+            SequenceLength = sequenceLength;
             StopLoss = stopLoss;
             TakeProfit = takeProfit;
-            Weights = weights;
             Offset = offset;
             Operation = operation;
-            IndicatorLastPointSequence = indicatorLastPointSequence;
             StandardDeviationCorrection = standardDeviationCorrection;
             RsiSlopeFitCorrection = rsiSlopeFitCorrection;
 
-            ParametersCount = _fixedOffset + weights.Length + Offset.Length + 3;
+            ParametersCount = _fixedOffset + Offset.Length + 5;
         }
-
-        public int IndicatorLastPointSequence { get; set; }
 
         public double[] Offset { get; set; }
         public OperationType Operation { get; set; }
         public double[] OptimizableArray { get; set; }
         public int ParametersCount { get; set; }
-        public int RsiPeriod { get; set; }
+        public int SequenceLength { get; set; }
         public PointStruct StopLoss { get; set; }
         public PointStruct TakeProfit { get; set; }
-        public PointStruct RsiLimits { get; set; }
+        public PointStruct SlopeLimits { get; set; }
+        public PointStruct SlopeLimitsRSquared { get; set; }
         public PointStruct RSquaredCutOff { get; set; }
-        public double[] Weights { get; set; }
         public double StandardDeviationCorrection { get; set; }
         public double RsiSlopeFitCorrection { get; set; }
 
@@ -58,8 +58,8 @@ namespace simple_rsi_trader.Models
             OptimizableArray[(int)OptimizingParameters.StopLoss] = StopLoss.Value;
             OptimizableArray[(int)OptimizingParameters.TakeProfit] = TakeProfit.Value;
 
-            OptimizableArray[(int)OptimizingParameters.Weight0] = Weights[0];
-            OptimizableArray[(int)OptimizingParameters.Weight1] = Weights[1];
+            OptimizableArray[(int)OptimizingParameters.Slope] = SlopeLimits.Value;
+            OptimizableArray[(int)OptimizingParameters.RSquared] = SlopeLimitsRSquared.Value;
 
             OptimizableArray[(int)OptimizingParameters.Offset0] = Offset[0];
             OptimizableArray[(int)OptimizingParameters.Offset1] = Offset[1];
@@ -75,18 +75,18 @@ namespace simple_rsi_trader.Models
 
         public void ToModel(double[] values)
         {
-            StopLoss = new PointStruct(range: StopLoss.Range, val: values[(int)OptimizingParameters.StopLoss]);
-            TakeProfit = new PointStruct(range: TakeProfit.Range, val: values[(int)OptimizingParameters.TakeProfit]);
+            StopLoss = new (range: StopLoss.Range, val: values[(int)OptimizingParameters.StopLoss]);
+            TakeProfit = new (range: TakeProfit.Range, val: values[(int)OptimizingParameters.TakeProfit]);
 
-            Weights[0] = values[(int)OptimizingParameters.Weight0];
-            Weights[1] = values[(int)OptimizingParameters.Weight1];
+            SlopeLimits = new (SlopeLimits.Range, val: values[(int)OptimizingParameters.Slope]);
+            SlopeLimitsRSquared = new(range: SlopeLimitsRSquared.Range, val: values[(int)OptimizingParameters.RSquared]);
 
             Offset[0] = values[(int)OptimizingParameters.Offset0];
             Offset[1] = values[(int)OptimizingParameters.Offset1];
             Offset[2] = values[(int)OptimizingParameters.Offset2];
             Offset[3] = values[(int)OptimizingParameters.Offset3];
 
-            RSquaredCutOff = new PointStruct(range: RSquaredCutOff.Range, val: values[(int)OptimizingParameters.RSquaredCutOff]);
+            RSquaredCutOff = new (range: RSquaredCutOff.Range, val: values[(int)OptimizingParameters.RSquaredCutOff]);
 
             StandardDeviationCorrection = OptimizableArray[(int)OptimizingParameters.ChangeEmaCorrection];
             RsiSlopeFitCorrection = OptimizableArray[(int)OptimizingParameters.RsiSlopeFitCorrection];

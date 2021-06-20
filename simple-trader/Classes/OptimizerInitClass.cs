@@ -11,7 +11,7 @@ using CommonLib.Models;
 using CommonLib.Models.Export;
 using CommonLib.Models.Range;
 using Newtonsoft.Json;
-using simple_rsi_trader.Models;
+using simple_trader.Models;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -19,9 +19,9 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using static CommonLib.Models.DataModel;
-using static simple_rsi_trader.Classes.OptimizerClass;
+using static simple_trader.Classes.OptimizerClass;
 
-namespace simple_rsi_trader.Classes
+namespace simple_trader.Classes
 {
     public class OptimizerInitClass
     {
@@ -38,7 +38,7 @@ namespace simple_rsi_trader.Classes
         private readonly DataModel[] _sourceData;
         private readonly int _testSize;
         private readonly int _validationSize;
-        private readonly IntRangeStruct _rsiRange;
+        private readonly IntRangeStruct _sequenceRange;
         private readonly Dictionary<OperationType, DoubleRangeStruct> _stopLossRange = new();
         private readonly Dictionary<OperationType, DoubleRangeStruct> _takeProfitRange = new();
         private readonly IntRangeStruct _lastRsiSequence;
@@ -52,23 +52,19 @@ namespace simple_rsi_trader.Classes
         
         private int _modelsLeft;
 
-        private readonly DoubleRangeStruct _rsiBuyLimits;
-        private readonly DoubleRangeStruct _rsiSellLimits;
-
         private readonly string _modelFileName;
 
 
         private bool _completionToken = false;
 
-        private Dictionary<int, DataModel[]> RsiEnrichedCollection { get; set; } = new();
+        private Dictionary<int, DataModel[]> SlopeEnrichedCollection { get; set; } = new();
+        private Dictionary<int, DoubleRangeStruct> SlopeLimits { get; set; } = new();
         private Dictionary<int, ReadOnlyMemory<SequenceClass>> TrainSet { get; set; } = new();
         private Dictionary<int, ReadOnlyMemory<SequenceClass>> TestSet { get; set; } = new();
         private Dictionary<int, ReadOnlyMemory<SequenceClass>> ValidationSet { get; set; } = new();
         private Dictionary<int, SequenceClass> LastPrice { get; set; } = new();
 
-        public OptimizerInitClass(int testSize, int validationSize, IntRangeStruct rsiRange, DoubleRangeStruct rsiBuyLimits, DoubleRangeStruct rsiSellLimits, DoubleRangeStruct stopLossRange, DoubleRangeStruct takeProfitRange, DataModel[] data, IntRangeStruct lastRsiSequence, int horizon, DateTime restrictByDate, double commission, string instrument, int roundPoint) {
-            _rsiBuyLimits = rsiBuyLimits;
-            _rsiSellLimits = rsiSellLimits;
+        public OptimizerInitClass(int testSize, int validationSize, IntRangeStruct rsiRange, DoubleRangeStruct stopLossRange, DoubleRangeStruct takeProfitRange, DataModel[] data, IntRangeStruct lastRsiSequence, int horizon, DateTime restrictByDate, double commission, string instrument, int roundPoint) {
             _instrument = instrument;
             _commission = commission;
             _roundPoint = roundPoint;
@@ -76,7 +72,7 @@ namespace simple_rsi_trader.Classes
             _lastRsiSequence = lastRsiSequence;
             _testSize = testSize;
             _validationSize = validationSize;
-            _rsiRange = rsiRange;
+            _sequenceRange = rsiRange;
             _sourceData = data;
 
             Dictionary<OperationType, List<double>> changes = new() {
@@ -101,8 +97,11 @@ namespace simple_rsi_trader.Classes
                 { OperationType.Buy, new(min: Measures.Quantile(changes[OperationType.Buy].ToArray(), takeProfitRange.Min), max: Measures.Quantile(changes[OperationType.Buy].ToArray(), takeProfitRange.Max) * (1 + _horizon * 0.1)) },
                 { OperationType.Sell, new(min: Measures.Quantile(changes[OperationType.Sell].ToArray(), takeProfitRange.Min), max: Measures.Quantile(changes[OperationType.Sell].ToArray(), takeProfitRange.Max) * (1 + _horizon * 0.1)) }
             };
-               
-            InitializeRsi(restrictByDate);
+
+            RsiClass rsi = new(period: 10);
+            _sourceData = rsi.GetRSiOriginal(_sourceData, (int)DataColumn.Close, (int)DataColumn.Rsi);
+
+            InitializeSequence(restrictByDate);
             CreateSequences();
 
             _modelFileName = $"{_instrument}.{_horizon}.trained";
@@ -111,10 +110,10 @@ namespace simple_rsi_trader.Classes
         }
 
         private void CreateSequences() {
-            int validationEndIndex = RsiEnrichedCollection[_rsiRange.Min].Length - _testSize - _validationSize;
-            int testEndIndex = RsiEnrichedCollection[_rsiRange.Min].Length - _testSize;
+            int validationEndIndex = SlopeEnrichedCollection[_sequenceRange.Min].Length - _testSize - _validationSize;
+            int testEndIndex = SlopeEnrichedCollection[_sequenceRange.Min].Length - _testSize;
 
-            foreach (var data in RsiEnrichedCollection) {
+            foreach (var data in SlopeEnrichedCollection) {
                 List<SequenceClass> trainSequences = new();
                 List<SequenceClass> testSequences = new();
                 List<SequenceClass> validationSequence = new();
@@ -169,21 +168,14 @@ namespace simple_rsi_trader.Classes
             List<ParametersModel> returnVar = new();
 
             for (int i = 0; i < count; i++) {
-                PointStruct buyConstant = new(range: _rsiBuyLimits, val: _rsiBuyLimits.Min + (_rsiBuyLimits.Max - _rsiBuyLimits.Min).GetRandomDouble());
-                PointStruct sellConstant = new(range: _rsiSellLimits, val: _rsiSellLimits.Min + (_rsiSellLimits.Max - _rsiSellLimits.Min).GetRandomDouble());
-
-                int lastPointSequence = (_lastRsiSequence.Max - _lastRsiSequence.Min).GetRandomInt() + _lastRsiSequence.Min;
-
-                double buySlope = lastPointSequence == 0 ? 0 : ((buyConstant.Value - _rsiBuyLimits.Min) / lastPointSequence).GetRandomDouble();
-                double sellSlope = lastPointSequence == 0 ? 0 : ((_rsiSellLimits.Max - sellConstant.Value) / lastPointSequence).GetRandomDouble();
+                int sequenceLength = (_sequenceRange.Max - _sequenceRange.Min).GetRandomInt() + _sequenceRange.Min;
 
                 returnVar.Add(new(
-                    rsiPeriod: (_rsiRange.Max - _rsiRange.Min).GetRandomInt() + _rsiRange.Min,
-                    rsiLimits: buyConstant,
+                    sequenceLength: sequenceLength,
+                    slopeLimits: new(range: new(min: SlopeLimits[sequenceLength].Min, max: 0), val: SlopeLimits[sequenceLength].Min.GetRandomDouble()),
+                    slopeLimitsRSquared: new(new(0, 1), 1d.GetRandomDouble()),
                     stopLoss: new(_stopLossRange[OperationType.Buy], (_stopLossRange[OperationType.Buy].Max - _stopLossRange[OperationType.Buy].Min).GetRandomDouble() + _stopLossRange[OperationType.Buy].Min),
                     takeProfit: new(_takeProfitRange[OperationType.Buy], (_takeProfitRange[OperationType.Buy].Max - _takeProfitRange[OperationType.Buy].Min).GetRandomDouble() + _takeProfitRange[OperationType.Buy].Min),
-                    weights: new double[] { buyConstant.Value, buySlope },
-                    indicatorLastPointSequence: lastPointSequence,
                     offset: new double[] { 0.15d.GetRandomDouble(), 0.001d.GetRandomDouble() - 0.0005, 0, 0 },
                     operation: OperationType.Buy,
                     rsquaredCutOff: new(range: new(min: 0.25, max: 0.95), 0.25 + 0.7d.GetRandomDouble()),
@@ -191,12 +183,11 @@ namespace simple_rsi_trader.Classes
                     rsiSlopeFitCorrection: 0));
 
                 returnVar.Add(new(
-                    rsiPeriod: (_rsiRange.Max - _rsiRange.Min).GetRandomInt() + _rsiRange.Min,
-                    rsiLimits: sellConstant,
+                    sequenceLength: sequenceLength,
+                    slopeLimits: new(range: new(min: 0, max: SlopeLimits[sequenceLength].Max), val: SlopeLimits[sequenceLength].Max.GetRandomDouble()),
+                    slopeLimitsRSquared: new(new(0, 1), 1d.GetRandomDouble()),
                     stopLoss: new(_stopLossRange[OperationType.Sell], (_stopLossRange[OperationType.Sell].Max - _stopLossRange[OperationType.Sell].Min).GetRandomDouble() + _stopLossRange[OperationType.Sell].Min),
                     takeProfit: new(_takeProfitRange[OperationType.Sell], (_takeProfitRange[OperationType.Sell].Max - _takeProfitRange[OperationType.Sell].Min).GetRandomDouble() + _takeProfitRange[OperationType.Sell].Min),
-                    weights: new double[] { sellConstant.Value, sellSlope },
-                    indicatorLastPointSequence: lastPointSequence,
                     offset: new double[] { 0.15d.GetRandomDouble(), 0.001d.GetRandomDouble() - 0.0005, 0, 0 },
                     operation: OperationType.Sell,
                     rsquaredCutOff: new(range: new(min: 0.25, max: 0.95), 0.25 + 0.7d.GetRandomDouble()),
@@ -210,18 +201,37 @@ namespace simple_rsi_trader.Classes
             return returnVar;
         }
 
-        private void InitializeRsi(DateTime restrictByDate) {
-            for (int i = _rsiRange.Min; i < _rsiRange.Max; i++) {
-                RsiClass rsi = new(period: i);
+        private void InitializeSequence(DateTime restrictByDate) {
+            for (int i = _sequenceRange.Min; i < _sequenceRange.Max; i++) {
                 DataModel[] data = _sourceData.Copy();
-                
-                data = rsi.GetRSiOriginal(data, (int)DataColumn.Close, (int)DataColumn.Rsi);
-                data = data
-                    .Where(m => m.Date >= restrictByDate)
-                    .OrderBy(m => m.Date)
-                    .ToArray();
 
-                RsiEnrichedCollection.Add(i, data);
+                double minValue = double.MaxValue;
+                double maxValue = double.MinValue;
+
+                double[] x = new double[i];
+                for (int j = 0; j < x.Length; j++) x[j] = j;
+
+                for (int j = i; j < data.Length; j++) {
+
+                    double[] y = data[(j - i + 1)..(j + 1)].Select(m => m.Data[(int)DataColumn.Close]).ToArray();
+
+                    OrdinaryLeastSquares ols = new();
+                    SimpleLinearRegression slr = ols.Learn(x, y);
+                    
+                    data[j].Data[(int)DataColumn.ClosePriceSlope] = slr.Slope;
+
+                    ReadOnlySpan<double> expectedY = new ReadOnlySpan<double>(slr.Transform(x));
+                    data[j].Data[(int)DataColumn.ClosePriceSlopeRSquared] = expectedY.RSquared(y);
+
+                    if (minValue > slr.Slope)
+                        minValue = slr.Slope;
+
+                    if (maxValue < slr.Slope)
+                        maxValue = slr.Slope;
+                }
+
+                SlopeEnrichedCollection.Add(i, data);
+                SlopeLimits.Add(i, new(min: minValue, max: maxValue));
             }
         }
 
@@ -249,11 +259,11 @@ namespace simple_rsi_trader.Classes
             if (_completionToken)
                 return;
 
-            OptimizerClass optimizer = new(sequences: TrainSet[parameter.RsiPeriod], parameter: parameter, commission: _commission, roundPoint: _roundPoint);
+            OptimizerClass optimizer = new(sequences: TrainSet[parameter.SequenceLength], parameter: parameter, commission: _commission, roundPoint: _roundPoint);
             var scoreChange = optimizer.Optimize(_minTrainingProfitRequired[parameter.Operation]);
 
             if (optimizer.IsSuccess) {
-                optimizer.LoadSequence(ValidationSet[parameter.RsiPeriod], false);
+                optimizer.LoadSequence(ValidationSet[parameter.SequenceLength], false);
                 optimizer.Validate();
 
                 if (optimizer.IsSuccess && ((double)optimizer.Performance[ExecutionType.Test].ActionCount / _testSize) >= _actionCountRequired) {
@@ -357,7 +367,7 @@ namespace simple_rsi_trader.Classes
 
             List<SavedModel> finalSavedFiltered = new();
 
-            _parametersSaved.GroupBy(m => m.Parameters.Operation).ToList().ForEach(operationGroup => finalSavedFiltered.AddRange(operationGroup.SelectDistinct()));
+            //_parametersSaved.GroupBy(m => m.Parameters.Operation).ToList().ForEach(operationGroup => finalSavedFiltered.AddRange(operationGroup.SelectDistinct()));
 
             SaveModels(finalSavedFiltered);
 
