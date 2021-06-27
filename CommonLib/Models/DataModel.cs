@@ -13,6 +13,7 @@ namespace CommonLib.Models
             Volume = 5,
 
             Rsi = 6,
+            Mfi = 9,
 
             ClosePriceSlope = 7,
             ClosePriceSlopeRSquared = 8

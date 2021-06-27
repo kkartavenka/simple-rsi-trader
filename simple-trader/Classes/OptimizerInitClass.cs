@@ -41,7 +41,6 @@ namespace simple_trader.Classes
         private readonly IntRangeStruct _sequenceRange;
         private readonly Dictionary<OperationType, DoubleRangeStruct> _stopLossRange = new();
         private readonly Dictionary<OperationType, DoubleRangeStruct> _takeProfitRange = new();
-        private readonly IntRangeStruct _lastRsiSequence;
         private readonly int _horizon;
         private readonly string _instrument;
 
@@ -64,15 +63,14 @@ namespace simple_trader.Classes
         private Dictionary<int, ReadOnlyMemory<SequenceClass>> ValidationSet { get; set; } = new();
         private Dictionary<int, SequenceClass> LastPrice { get; set; } = new();
 
-        public OptimizerInitClass(int testSize, int validationSize, IntRangeStruct rsiRange, DoubleRangeStruct stopLossRange, DoubleRangeStruct takeProfitRange, DataModel[] data, IntRangeStruct lastRsiSequence, int horizon, DateTime restrictByDate, double commission, string instrument, int roundPoint) {
+        public OptimizerInitClass(int testSize, int validationSize, IntRangeStruct sequenceRange, DoubleRangeStruct stopLossRange, DoubleRangeStruct takeProfitRange, DataModel[] data, int horizon, DateTime restrictByDate, double commission, string instrument, int roundPoint) {
             _instrument = instrument;
             _commission = commission;
             _roundPoint = roundPoint;
             _horizon = horizon;
-            _lastRsiSequence = lastRsiSequence;
             _testSize = testSize;
             _validationSize = validationSize;
-            _sequenceRange = rsiRange;
+            _sequenceRange = sequenceRange;
             _sourceData = data;
 
             Dictionary<OperationType, List<double>> changes = new() {
@@ -94,12 +92,15 @@ namespace simple_trader.Classes
             };
 
             _takeProfitRange = new() {
-                { OperationType.Buy, new(min: Measures.Quantile(changes[OperationType.Buy].ToArray(), takeProfitRange.Min), max: Measures.Quantile(changes[OperationType.Buy].ToArray(), takeProfitRange.Max) * (1 + _horizon * 0.1)) },
-                { OperationType.Sell, new(min: Measures.Quantile(changes[OperationType.Sell].ToArray(), takeProfitRange.Min), max: Measures.Quantile(changes[OperationType.Sell].ToArray(), takeProfitRange.Max) * (1 + _horizon * 0.1)) }
+                { OperationType.Buy, new(min: Measures.Quantile(changes[OperationType.Buy].ToArray(), takeProfitRange.Min), max: Measures.Quantile(changes[OperationType.Buy].ToArray(), takeProfitRange.Max) * (1 + _horizon * 0.05)) },
+                { OperationType.Sell, new(min: Measures.Quantile(changes[OperationType.Sell].ToArray(), takeProfitRange.Min), max: Measures.Quantile(changes[OperationType.Sell].ToArray(), takeProfitRange.Max) * (1 + _horizon * 0.05)) }
             };
 
             RsiClass rsi = new(period: 10);
             _sourceData = rsi.GetRSiOriginal(_sourceData, (int)DataColumn.Close, (int)DataColumn.Rsi);
+
+            MfiClass mfi = new(period: 10);
+            _sourceData = mfi.GetMfi(model: _sourceData, columnSignalIndex: (int)DataColumn.TypicalPrice, columnVolumeIndex: (int)DataColumn.Volume, columnDestinationIndex: (int)DataColumn.Mfi);
 
             InitializeSequence(restrictByDate);
             CreateSequences();
@@ -118,16 +119,16 @@ namespace simple_trader.Classes
                 List<SequenceClass> testSequences = new();
                 List<SequenceClass> validationSequence = new();
 
-                for (int i = _lastRsiSequence.Max; i < validationEndIndex; i++)
-                    trainSequences.Add(new(before: data.Value[(i - _lastRsiSequence.Max)..i], after: data.Value[i..(i + _horizon)]));
+                for (int i = _sequenceRange.Max; i < validationEndIndex; i++)
+                    trainSequences.Add(new(before: data.Value[(i - _sequenceRange.Max)..i], after: data.Value[i..(i + _horizon)], priceSequenceLimit: data.Key));
 
                 for (int i = validationEndIndex; i < testEndIndex; i++)
-                    validationSequence.Add(new(before: data.Value[(i - _lastRsiSequence.Max)..i], after: data.Value[i..(i + _horizon)]));
+                    validationSequence.Add(new(before: data.Value[(i - _sequenceRange.Max)..i], after: data.Value[i..(i + _horizon)], priceSequenceLimit: data.Key));
 
                 for (int i = testEndIndex; i < data.Value.Length - _horizon + 1; i++)
-                    testSequences.Add(new(before: data.Value[(i - _lastRsiSequence.Max)..i], after: data.Value[i..(i + _horizon)]));
+                    testSequences.Add(new(before: data.Value[(i - _sequenceRange.Max)..i], after: data.Value[i..(i + _horizon)], priceSequenceLimit: data.Key));
 
-                LastPrice.Add(data.Key, new(before: data.Value[^_lastRsiSequence.Max..], after: null));
+                LastPrice.Add(data.Key, new(before: data.Value[^_sequenceRange.Max..], after: null, priceSequenceLimit: data.Key));
 
                 TrainSet.Add(data.Key, trainSequences.ToArray());
                 TestSet.Add(data.Key, testSequences.ToArray());
@@ -144,22 +145,20 @@ namespace simple_trader.Classes
             List<PredictionModel> predictions = new();
 
             saved.GroupBy(m => m.Parameters.Operation).ToList().ForEach(operation => {
-                Console.WriteLine(operation.Key);
-
                 IEnumerable<SavedModel> top = operation.Where(m => m.TestedPerformance.Score > 0);
 
                 StrategyClass strategy = new(models: top, operation: operation.Key, roundPoint: _roundPoint, commission: _commission, distanceBetweenOrders: _stopLossRange[operation.Key].Min);
                 strategy.LoadSequences(TestSet);
                 predictions.AddRange(strategy.Test());
 
-                Console.WriteLine($"Total profit of the strategy: {(strategy.Profit / _commission):N3}");
+                Console.WriteLine($"{operation.Key}\tProfit: {(strategy.Profit / _commission):N3}\tScore {strategy.Score / _commission:N3}\tWin {strategy.WinCount}\tLoss {strategy.LossCount}");
 
             });
 
             try {
                 SqliteExportClass exporter = new($"{_modelFileName}");
                 exporter.PushPredictions(predictions);
-                exporter.PushInstrumentData(_sourceData.Where(m => m.Id >= predictions.Min(m => m.Id)).ToArray());
+                exporter.PushInstrumentData(_sourceData.Where(m => m.Id >= predictions.Min(m => m.Id - 7)).ToArray());
             }
             catch { }
         }
@@ -173,26 +172,28 @@ namespace simple_trader.Classes
                 returnVar.Add(new(
                     sequenceLength: sequenceLength,
                     slopeLimits: new(range: new(min: SlopeLimits[sequenceLength].Min, max: 0), val: SlopeLimits[sequenceLength].Min.GetRandomDouble()),
-                    slopeLimitsRSquared: new(new(0, 1), 1d.GetRandomDouble()),
+                    slopeLimitsRSquared: new(new(0.2, 1), 0.2 + 0.8d.GetRandomDouble()),
                     stopLoss: new(_stopLossRange[OperationType.Buy], (_stopLossRange[OperationType.Buy].Max - _stopLossRange[OperationType.Buy].Min).GetRandomDouble() + _stopLossRange[OperationType.Buy].Min),
                     takeProfit: new(_takeProfitRange[OperationType.Buy], (_takeProfitRange[OperationType.Buy].Max - _takeProfitRange[OperationType.Buy].Min).GetRandomDouble() + _takeProfitRange[OperationType.Buy].Min),
-                    offset: new double[] { 0.15d.GetRandomDouble(), 0.001d.GetRandomDouble() - 0.0005, 0, 0 },
+                    offset: new double[] { 0.1d.GetRandomDouble(), 0.001d.GetRandomDouble() - 0.0005, 0},
                     operation: OperationType.Buy,
-                    rsquaredCutOff: new(range: new(min: 0.25, max: 0.95), 0.25 + 0.7d.GetRandomDouble()),
+                    mfi: new double[] { 0.001d.GetRandomDouble() - 0.0005, 0 },
                     standardDeviationCorrection: 0,
-                    rsiSlopeFitCorrection: 0));
+                    rsi: new double[] { 0.001d.GetRandomDouble() - 0.0005, 0 },
+                    slopeRSquaredFitCorrection: 0));
 
                 returnVar.Add(new(
                     sequenceLength: sequenceLength,
                     slopeLimits: new(range: new(min: 0, max: SlopeLimits[sequenceLength].Max), val: SlopeLimits[sequenceLength].Max.GetRandomDouble()),
-                    slopeLimitsRSquared: new(new(0, 1), 1d.GetRandomDouble()),
+                    slopeLimitsRSquared: new(new(0.2, 1), 0.2 + 0.8d.GetRandomDouble()),
                     stopLoss: new(_stopLossRange[OperationType.Sell], (_stopLossRange[OperationType.Sell].Max - _stopLossRange[OperationType.Sell].Min).GetRandomDouble() + _stopLossRange[OperationType.Sell].Min),
                     takeProfit: new(_takeProfitRange[OperationType.Sell], (_takeProfitRange[OperationType.Sell].Max - _takeProfitRange[OperationType.Sell].Min).GetRandomDouble() + _takeProfitRange[OperationType.Sell].Min),
-                    offset: new double[] { 0.15d.GetRandomDouble(), 0.001d.GetRandomDouble() - 0.0005, 0, 0 },
+                    offset: new double[] { 0.1d.GetRandomDouble(), 0.001d.GetRandomDouble() - 0.0005, 0},
                     operation: OperationType.Sell,
-                    rsquaredCutOff: new(range: new(min: 0.25, max: 0.95), 0.25 + 0.7d.GetRandomDouble()),
+                    mfi: new double[] { 0.001d.GetRandomDouble() - 0.0005, 0 },
                     standardDeviationCorrection: 0,
-                    rsiSlopeFitCorrection: 0));
+                    rsi: new double[] { 0.001d.GetRandomDouble() - 0.0005, 0 },
+                    slopeRSquaredFitCorrection: 0));
             }
 
             _modelsLeft = returnVar.Count;
@@ -319,42 +320,8 @@ namespace simple_trader.Classes
                             _parametersSaved.Add(newModel);
                     });
 
-                    List<SavedModel> reducedModels = new();
 
-                    var groupedByOperation = _parametersSaved.GroupBy(m => m.Parameters.Operation);
-                    foreach (var group in groupedByOperation) {
-
-                        var randomizedModels = group.OrderBy(m => 1d.GetRandomDouble()).ToList();
-                        int tryCount = (int)Math.Floor(randomizedModels.Count * 0.1);
-                        var optimizedModels = randomizedModels;
-
-                        if (tryCount > 0) {
-                            StrategyClass fullStrategy = new(randomizedModels, group.Key, _roundPoint, _commission, distanceBetweenOrders: _stopLossRange[group.Key].Min);
-                            fullStrategy.LoadSequences(ValidationSet);
-                            fullStrategy.Test();
-
-                            double profit = fullStrategy.Profit;
-
-                            for (int i = 0; i < tryCount; i++) {
-
-                                List<SavedModel> reducedList = randomizedModels.Copy();
-                                reducedList.RemoveAt(i);
-
-                                StrategyClass reducedStrategy = new(reducedList, group.Key, _roundPoint, _commission, distanceBetweenOrders: _stopLossRange[group.Key].Min);
-                                reducedStrategy.LoadSequences(ValidationSet);
-                                reducedStrategy.Test();
-
-                                if (reducedStrategy.Profit > profit) {
-                                    optimizedModels = reducedList;
-                                    profit = reducedStrategy.Profit;
-                                }
-                            }
-                        }
-                        reducedModels.AddRange(optimizedModels);
-
-                    }
-
-                    _parametersSaved = reducedModels;
+                    _parametersSaved = ReduceModels(0.1);
 
                     SaveModels(_parametersSaved);
                 }
@@ -365,12 +332,49 @@ namespace simple_trader.Classes
                     break;
             }
 
-            List<SavedModel> finalSavedFiltered = new();
+            _parametersSaved = ReduceModels(1);
+            SaveModels(_parametersSaved);
+        }
 
-            //_parametersSaved.GroupBy(m => m.Parameters.Operation).ToList().ForEach(operationGroup => finalSavedFiltered.AddRange(operationGroup.SelectDistinct()));
+        public List<SavedModel> ReduceModels(double tryRestrictor) {
 
-            SaveModels(finalSavedFiltered);
+            List<SavedModel> reducedModels = new();
 
+            var groupedByOperation = _parametersSaved.GroupBy(m => m.Parameters.Operation);
+
+            foreach (var group in groupedByOperation) {
+
+                var randomizedModels = group.OrderBy(m => 1d.GetRandomDouble()).ToList();
+                int tryCount = (int)Math.Floor(randomizedModels.Count * tryRestrictor);
+                var optimizedModels = randomizedModels;
+
+                if (tryCount > 0) {
+                    StrategyClass fullStrategy = new(randomizedModels, group.Key, _roundPoint, _commission, distanceBetweenOrders: _stopLossRange[group.Key].Min);
+                    fullStrategy.LoadSequences(ValidationSet);
+                    fullStrategy.Test();
+
+                    double profit = fullStrategy.Profit;
+
+                    for (int i = 0; i < tryCount; i++) {
+
+                        List<SavedModel> reducedList = randomizedModels.Copy();
+                        reducedList.RemoveAt(i);
+
+                        StrategyClass reducedStrategy = new(reducedList, group.Key, _roundPoint, _commission, distanceBetweenOrders: _stopLossRange[group.Key].Min);
+                        reducedStrategy.LoadSequences(ValidationSet);
+                        reducedStrategy.Test();
+
+                        if (reducedStrategy.Profit > profit) {
+                            optimizedModels = reducedList;
+                            profit = reducedStrategy.Profit;
+                        }
+                    }
+                }
+                reducedModels.AddRange(optimizedModels);
+
+            }
+
+            return reducedModels;
         }
 
         public void StartOptimization(int randomInitCount, int degreeOfParallelism = -1) {

@@ -52,9 +52,6 @@ namespace simple_trader.Classes
                     weights[(int)OptimizingParameters.Slope] = _parameter.SlopeLimits.Range.Max;
             }
 
-            if (weights[(int)OptimizingParameters.RSquaredCutOff] < _parameter.RSquaredCutOff.Range.Min)
-                weights[(int)OptimizingParameters.RSquaredCutOff] = _parameter.RSquaredCutOff.Range.Min;
-
             return weights;
         }
 

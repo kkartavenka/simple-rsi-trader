@@ -34,7 +34,7 @@ namespace simple_trader.Classes
             List<PredictionStruct> returnVar = new();
 
             _models.ForEach(m => {
-                ActivationReturnStruct activationStatus = sequence[m.Parameters.SequenceLength].CheckActivation(m.Parameters.SlopeLimits.Value, m.Parameters.RSquaredCutOff.Value, m.Parameters);
+                ActivationReturnStruct activationStatus = sequence[m.Parameters.SequenceLength].CheckActivation(m.Parameters.SlopeLimits.Value, m.Parameters.SlopeLimitsRSquared.Value, m.Parameters);
                 if (activationStatus.Activated)
                     preparedOrders.Add(sequence[m.Parameters.SequenceLength].GetOrder(
                         weights: m.Parameters.OptimizableArray,
@@ -49,11 +49,21 @@ namespace simple_trader.Classes
 
             double orderDistance = sequence.First().Value.CurrentClosePrice * _distanceBetweenOrders;
 
-            if (_operation == OperationType.Sell) {
+            return AggregateOrders(preparedOrders, orderDistance);
+        }
+
+        private List<PredictionStruct> AggregateOrders(List<PredictionStruct> predictions, double orderDistance)
+        {
+            List<PredictionStruct> preparedOrders = predictions;
+            List<PredictionStruct> returnVar = new();
+
+            if (_operation == OperationType.Sell)
+            {
                 preparedOrders = preparedOrders.OrderBy(m => m.LimitOrder).ThenBy(m => m.StopLoss).ToList();
                 double minLimitOrder = preparedOrders.First().LimitOrder;
 
-                while (preparedOrders.Where(m => m.LimitOrder >= minLimitOrder).Count() > 0) {
+                while (preparedOrders.Where(m => m.LimitOrder >= minLimitOrder).Count() > 0)
+                {
                     List<PredictionStruct> similarOrders = preparedOrders.Where(m => m.LimitOrder >= minLimitOrder && m.LimitOrder < minLimitOrder + orderDistance).ToList();
                     returnVar.Add(similarOrders.OrderByDescending(m => m.Score).First());
 
@@ -61,11 +71,13 @@ namespace simple_trader.Classes
                     minLimitOrder = nextPoints.Count != 0 ? nextPoints.First().LimitOrder : double.MaxValue;
                 }
             }
-            else if (_operation == OperationType.Buy) {
+            else if (_operation == OperationType.Buy)
+            {
                 preparedOrders = preparedOrders.OrderByDescending(m => m.LimitOrder).ThenByDescending(m => m.StopLoss).ToList();
 
                 double maxLimitOrder = preparedOrders.First().LimitOrder;
-                while (preparedOrders.Where(m=>m.LimitOrder <= maxLimitOrder).Count() > 0) {
+                while (preparedOrders.Where(m => m.LimitOrder <= maxLimitOrder).Count() > 0)
+                {
                     List<PredictionStruct> similarOrders = preparedOrders.Where(m => m.LimitOrder <= maxLimitOrder && m.LimitOrder > maxLimitOrder - orderDistance).ToList();
                     returnVar.Add(similarOrders.OrderByDescending(m => m.Score).First());
 
@@ -74,7 +86,11 @@ namespace simple_trader.Classes
                 }
             }
 
-            return returnVar;
+            if (preparedOrders.Count == returnVar.Count)
+                return returnVar;
+
+            return AggregateOrders(returnVar, orderDistance);
+
         }
 
         public void LoadSequences(Dictionary<int, ReadOnlyMemory<SequenceClass>> testSet) => _testSet = testSet;
@@ -87,9 +103,12 @@ namespace simple_trader.Classes
         }
 
         public List<PredictionModel> Test() {
-            double profit = 0;
+            Profit = 0;
+            WinCount = 0;
+            LossCount = 0;
+
             int itemCount = _testSet.First().Value.Length;
-            int actionCount = 0;
+
             List<int> rsiPeriod = _testSet.Keys.ToList();
 
             List<PredictionModel> export = new();
@@ -122,19 +141,26 @@ namespace simple_trader.Classes
                         commission: _commission);
 
                     if (result.outcome != ActionOutcome.NoAction) {
-                        actionCount++;
-                        profit += result.profit;
+                        if (result.profit > 0)
+                            WinCount++;
+                        else if (result.profit < 0)
+                            LossCount++;
+
+                        Profit += result.profit;
                     }
                 });
             }
 
-            IsSuccess = profit > 0;
-            Profit = profit;// actionCount != 0 ? profit / actionCount : 0;
+            IsSuccess = Profit > 0;
+            Score = Profit / (WinCount + LossCount);
 
             return export;
         }
 
         public bool IsSuccess { get; private set; }
         public double Profit { get; private set; }
+        public double Score { get; private set; }
+        public int WinCount { get; private set; }
+        public double LossCount { get; private set; }
     }
 }
