@@ -32,21 +32,23 @@ namespace simple_trader
         static readonly DateTime _restrictByDate = new(2010, 01, 01);// new(2000, 01, 01);
         static readonly List<SignalModel> _dailyCharts = new()
         {
-            new(name: "USDJPY1440.csv", commission: 0.007, stopLossRange: new(0.2, 0.55), takeProfitRange: new(0.65, 1), randomInitPoint: 300000, datasetInfo: new(validationSize: 0.3, testSize: _testSize)),
-            new(name: "EURUSD1440.csv", commission: 0.00007, stopLossRange: new(0.2, 0.55), takeProfitRange: new(0.65, 1), randomInitPoint: 300000, datasetInfo: new(validationSize: 0.3, testSize: _testSize)),
-            new(name: "GBPUSD1440.csv", commission: 0.00009, stopLossRange: new(0.2, 0.6), takeProfitRange: new(0.65, 1), randomInitPoint: 300000, datasetInfo: new(validationSize: 0.3, testSize: _testSize)),
+            new(name: "USDJPY1440.csv", commission: 0.007, stopLossRange: new(0.2, 0.55), takeProfitRange: new(0.6, 1), randomInitPoint: 300000, datasetInfo: new(validationSize: 0.3, testSize: _testSize)),
+            new(name: "EURUSD1440.csv", commission: 0.00007, stopLossRange: new(0.2, 0.55), takeProfitRange: new(0.6, 1), randomInitPoint: 300000, datasetInfo: new(validationSize: 0.3, testSize: _testSize)),
+            new(name: "GBPUSD1440.csv", commission: 0.00009, stopLossRange: new(0.2, 0.6), takeProfitRange: new(0.65, 1), randomInitPoint: 400000, datasetInfo: new(validationSize: 0.3, testSize: _testSize)),
 
-            new(name: "USDSGD1440.csv", commission: 0.0002, stopLossRange: new(0.2, 0.6), takeProfitRange: new(0.65, 1), randomInitPoint: 300000, datasetInfo: new(validationSize: 0.3, testSize: _testSize)),
+            new(name: "USDSGD1440.csv", commission: 0.0002, stopLossRange: new(0.2, 0.6), takeProfitRange: new(0.65, 1), randomInitPoint: 500000, datasetInfo: new(validationSize: 0.3, testSize: _testSize)),
 
-            new(name: "EURCHF1440.csv", commission: 0.00025, stopLossRange: new(0.2, 0.6), takeProfitRange: new(0.65, 1), randomInitPoint: 300000, datasetInfo: new(validationSize: 0.3, testSize: _testSize)),
+            new(name: "EURCHF1440.csv", commission: 0.00025, stopLossRange: new(0.2, 0.6), takeProfitRange: new(0.65, 1), randomInitPoint: 500000, datasetInfo: new(validationSize: 0.3, testSize: _testSize)),
+            new(name: "GBPJPY1440.csv", commission: 0.025, stopLossRange: new(0.2, 0.6), takeProfitRange: new(0.65, 1), randomInitPoint: 200000, datasetInfo: new(validationSize: 0.3, testSize: _testSize)),
+            new(name: "EURSEK1440.csv", commission: 0.00417, stopLossRange: new(0.2, 0.6), takeProfitRange: new(0.65, 1), randomInitPoint: 200000, datasetInfo: new(validationSize: 0.3, testSize: _testSize)),
 
-            new(name: "XAUUSD1440.csv", commission: 0.3, stopLossRange: new(0.25, 0.6), takeProfitRange: new(0.65, 1), randomInitPoint: 150000, datasetInfo: new(validationSize: 0.3, testSize: _testSize)),
+            //new(name: "XAUUSD1440.csv", commission: 0.3, stopLossRange: new(0.25, 0.6), takeProfitRange: new(0.65, 1), randomInitPoint: 150000, datasetInfo: new(validationSize: 0.3, testSize: _testSize)),
 
             new(name: "NATGAS1440.csv", commission: 0.003, stopLossRange: new(0.05, 0.4), takeProfitRange: new(0.5, 1), randomInitPoint: 100000, datasetInfo: new(validationSize: 0.3, testSize: _testSize)),
 
             new(name: "XPDUSD1440.csv", commission: 4.31, stopLossRange: new(0.25, 0.75), takeProfitRange: new(0.65, 1), randomInitPoint: 200000, datasetInfo: new(validationSize: 0.3, testSize: _testSize)),
-            //
-            //new(name: "XAUUSD60.csv", commission: 0.3, stopLossRange: new(10, 40), takeProfitRange: new(40, 400), randomInitPoint: 100000, datasetInfo: new(validationSize: 0.1, testSize: _testSize))
+            
+            //new(name: "XAUUSD60.csv", commission: 0.3, stopLossRange: new(0.2, 0.6), takeProfitRange: new(0.65, 1), randomInitPoint: 100000, datasetInfo: new(validationSize: 0.3, testSize: _testSize))
         };
 
         #endregion

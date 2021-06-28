@@ -19,7 +19,7 @@
             LossRate = (double)LossCount / ActionCount;
 
             Profit /= (commission * size);
-            Score = Profit; // For now but should be changed in the future
+            Score = Profit + 0.1 * WinRate / (WinRate + LossRate); // For now but should be changed in the future
         }
 
     }

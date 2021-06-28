@@ -151,7 +151,7 @@ namespace simple_trader.Classes
                 strategy.LoadSequences(TestSet);
                 predictions.AddRange(strategy.Test());
 
-                Console.WriteLine($"{operation.Key}\tProfit: {(strategy.Profit / _commission):N3}\tScore {strategy.Score / _commission:N3}\tWin {strategy.WinCount}\tLoss {strategy.LossCount}");
+                Console.WriteLine($"{operation.Key}\tProfit: {(strategy.Profit / _commission):N3}\tScore {strategy.Score / _commission:N3}\tWin {strategy.WinCount}\tLoss {strategy.LossCount}\n");
 
             });
 
@@ -270,7 +270,7 @@ namespace simple_trader.Classes
                 if (optimizer.IsSuccess && ((double)optimizer.Performance[ExecutionType.Test].ActionCount / _testSize) >= _actionCountRequired) {
                     double improvement = scoreChange.postTrainScore / scoreChange.preTrainScore - 1;
 
-                    Console.WriteLine($"Before: {scoreChange.preTrainScore:N3}\tAfter: {scoreChange.postTrainScore:N3}\t{improvement:N2}\t{parameter.Operation}");
+                    //Console.Write($"\rBefore: {scoreChange.preTrainScore:N3}\tAfter: {scoreChange.postTrainScore:N3}\t{improvement:N2}\t{parameter.Operation}");
 
                     _parametersQueue.Enqueue(new(parameters: parameter.Copy(), tested: optimizer.Performance[ExecutionType.Test], trained: optimizer.Performance[ExecutionType.Train]));
                 }
@@ -316,8 +316,10 @@ namespace simple_trader.Classes
                         newStrategy.LoadSequences(ValidationSet);
                         newStrategy.Test();
 
-                        if (newStrategy.Profit > existingStrategy.Profit)
+                        if (newStrategy.Profit > existingStrategy.Profit) {
                             _parametersSaved.Add(newModel);
+                            Console.Write($"\rStrategy {newModel.Parameters.Operation} profit increased from {existingStrategy.Profit} to {newStrategy.Profit}\t\t\t ");
+                        }
                     });
 
 
@@ -399,7 +401,7 @@ namespace simple_trader.Classes
         }
 
         private void SaveModels(List<SavedModel> models) {
-            Console.WriteLine($"{DateTime.Now} Models left: {_modelsLeft}");
+            Console.Write($"\n\r{DateTime.Now} Models left: {_modelsLeft}");
 
             try {
                 File.WriteAllText(_modelFileName, JsonConvert.SerializeObject(models));

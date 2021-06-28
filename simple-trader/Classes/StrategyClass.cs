@@ -33,14 +33,15 @@ namespace simple_trader.Classes
             List<PredictionStruct> preparedOrders = new();
             List<PredictionStruct> returnVar = new();
 
-            _models.ForEach(m => {
+            _models.ForEach(m =>
+            {
                 ActivationReturnStruct activationStatus = sequence[m.Parameters.SequenceLength].CheckActivation(m.Parameters.SlopeLimits.Value, m.Parameters.SlopeLimitsRSquared.Value, m.Parameters);
                 if (activationStatus.Activated)
                     preparedOrders.Add(sequence[m.Parameters.SequenceLength].GetOrder(
                         weights: m.Parameters.OptimizableArray,
                         parameter: m.Parameters,
                         roundPoint: _roundPoint,
-                        score: m.TestedPerformance.Score,
+                        score: (m.TestedPerformance.Score + m.TrainedPerformance.Score) / m.Parameters.TakeProfit.Value,
                         activationStatus: activationStatus));
             });
 

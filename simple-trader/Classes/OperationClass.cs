@@ -82,24 +82,10 @@ namespace simple_trader.Classes
                     + sequence.ChangeEMA * weights[(int)OptimizingParameters.ChangeEmaCorrection]
                     - sequence.SmoothedSlope * sequence.SmoothedSlopeRSquared * weights[(int)OptimizingParameters.SlopeRSquaredFitCorrection]);
 
-                /*limitOrder = sequence.CurrentClosePrice
-                    + sequence.CurrentClosePrice * (weights[(int)OptimizingParameters.Offset0]
-                    - weights[(int)OptimizingParameters.Offset1] * sequence.SmoothedSlope
-                    - weights[(int)OptimizingParameters.Offset2] * Math.Pow( sequence.SmoothedSlope, 2)
-
-                    - (sequence.Rsi * weights[(int)OptimizingParameters.Rsi0] + Math.Pow(sequence.Rsi, 2) * weights[(int)OptimizingParameters.Rsi1])
-                    - (sequence.Mfi * weights[(int)OptimizingParameters.Mfi0] + Math.Pow(sequence.Mfi, 2) * weights[(int)OptimizingParameters.Mfi1])
-                    
-                    + sequence.ChangeEMA * weights[(int)OptimizingParameters.ChangeEmaCorrection]
-                    - sequence.SmoothedSlope * sequence.SmoothedSlopeRSquared * weights[(int)OptimizingParameters.SlopeRSquaredFitCorrection]);*/
-
                 if (limitOrder < sequence.CurrentClosePrice && !isTraining)
                     limitOrder = sequence.CurrentClosePrice;
             }
             else {
-                /*double invertedRsi = 100 - sequence.Rsi;
-                double invertedMfi = 100 - sequence.Mfi;*/
-
                 limitOrder = sequence.CurrentClosePrice
                     - sequence.CurrentClosePrice * (weights[(int)OptimizingParameters.Offset0]
                     - weights[(int)OptimizingParameters.Offset1] * sequence.SmoothedSlope
@@ -110,17 +96,6 @@ namespace simple_trader.Classes
 
                     + sequence.ChangeEMA * weights[(int)OptimizingParameters.ChangeEmaCorrection]
                     - sequence.SmoothedSlope * sequence.SmoothedSlopeRSquared * weights[(int)OptimizingParameters.SlopeRSquaredFitCorrection]);
-
-                /*limitOrder = sequence.CurrentClosePrice
-                    - sequence.CurrentClosePrice * (weights[(int)OptimizingParameters.Offset0]
-                    - weights[(int)OptimizingParameters.Offset1] * sequence.SmoothedSlope
-                    - weights[(int)OptimizingParameters.Offset2] * Math.Pow(sequence.SmoothedSlope, 2)
-
-                    - (invertedRsi * weights[(int)OptimizingParameters.Rsi0] + Math.Pow(invertedRsi, 2) * weights[(int)OptimizingParameters.Rsi1])
-                    - (invertedMfi * weights[(int)OptimizingParameters.Mfi0] + Math.Pow(invertedMfi, 2) * weights[(int)OptimizingParameters.Mfi1])
-
-                    + sequence.ChangeEMA * weights[(int)OptimizingParameters.ChangeEmaCorrection]
-                    - sequence.SmoothedSlope * sequence.SmoothedSlopeRSquared * weights[(int)OptimizingParameters.SlopeRSquaredFitCorrection]);*/
 
                 if (limitOrder > sequence.CurrentClosePrice && !isTraining)
                     limitOrder = sequence.CurrentClosePrice;
